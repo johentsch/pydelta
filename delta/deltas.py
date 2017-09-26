@@ -586,7 +586,7 @@ class MetricDeltaFunction(DeltaFunction):
         dm = pairwise_distances(corpus, metric=self.metric, n_jobs=-1, **self.kwargs)
         if self.fix_symmetry:
             dm = np.tril(dm, -1)
-            dm += dm.T
+            dm = dm + dm.T
         df = pd.DataFrame(data=dm, index=corpus.index, columns=corpus.index)
         if self.scale:
             df = df / corpus.columns.size
