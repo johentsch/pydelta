@@ -54,3 +54,10 @@ class Delta_Test:
 
     def cosine_delta_test(self):
         self.check_function(d.functions.cosine_delta, 0.6156353166442046)
+
+    def composite_metric_test(self):
+        mcosine = d.MetricDeltaFunction('cosine', 'mcosine')
+        assert mcosine.fix_symmetry == True, "fix_symmetry is False!?"
+        mcd = d.CompositeDeltaFunction('mcosine-z_score', 'metric_cosine_delta')
+        assert mcd.basis.fix_symmetry == True, "basis.fix_symmetry is False!?"
+        self.check_function(d.functions.metric_cosine_delta, 0.6156353166442046)
