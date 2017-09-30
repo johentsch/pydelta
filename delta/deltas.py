@@ -406,10 +406,11 @@ class DeltaFunction:
         Raises:
             NotImplementedError if there is no metric
         """
-        if hasattr(self, metric):
+        if hasattr(self, 'metric'):
             return corpus
         else:
             raise NotImplementedError("This delta function does not support a standard metric.")
+
 
 class _LinearDelta(DeltaFunction):
 
