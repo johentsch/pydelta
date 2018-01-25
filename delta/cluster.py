@@ -259,4 +259,4 @@ try:
 
 except ImportError:
     logger.log(logging.WARNING, "KMedoids clustering not available.\n" \
-               "You need a patched scikit-learn, see README.txt", exc_info=1)
+               "You need a patched scikit-learn, see README.txt", exc_info=0)
