@@ -48,7 +48,10 @@ import numpy as np
 import pandas as pd
 import scipy.spatial.distance as ssd
 from scipy import linalg
-from scipy.misc import comb
+try:
+    from scipy.misc import comb
+except ImportError:
+    from scipy.special import comb
 from itertools import combinations
 from functools import update_wrapper
 from .util import Metadata
