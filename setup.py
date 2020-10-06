@@ -21,7 +21,7 @@ setup(
         'scipy>=0.14.0',
         'matplotlib>=1.3.1',
         'numpy>=1.8.1',
-        'pandas>=0.13.1',
+        'pandas>=0.13.1,<1.0',          # https://github.com/cophi-wue/pydelta/issues/6
 #        'profig>=0.2.8',
         'scikit-learn>=0.16.0',
         'regex'
