@@ -1,63 +1,36 @@
+from pytest import approx
+
 import delta as d
 import os
-# from nose.tools import eq_
 from math import log10, pow
-
-testdir = None
-c1000 = None
+import pytest
 
 
-def setup_module():
-    global testdir
-    global c1000
-    testdir = os.path.join(
-        os.path.dirname(
-            os.path.abspath(__file__)),
-        'corpus3')
-    c1000 = d.Corpus(testdir).get_mfw_table(1000)
+
+@pytest.fixture(scope='module')
+def c1000(testdir):
+    return d.Corpus(testdir).get_mfw_table(1000)
 
 
-def feq_(result, expected, msg=None, threshold=None):
-    if threshold is None:
-        threshold = pow(10, log10(expected)-2)
-    if msg is None:
-        msg = "{} != {}".format(result, expected)
-    assert abs(expected - result) < threshold, msg
+def fn_id(fn):
+    return fn.name if isinstance(fn, d.DeltaFunction) else None
+
+@pytest.mark.parametrize("function,expected_distance", [(d.functions.burrows, 0.7538867972199293),
+                                                        (d.functions.linear, 1149.434663563308),
+                                                        (d.functions.quadratic, 1102.845003724634),
+                                                        (d.functions.eder, 0.3703309813454142),
+                                                        (d.functions.cosine_delta, 0.6156353166442046)],
+                         ids=fn_id)
+def test_distance(function, expected_distance, c1000):
+    distances = function(c1000)
+    sample = distances.at['Fontane,-Theodor_Der-Stechlin',
+                          'Fontane,-Theodor_Effi-Briest']
+    assert sample == approx(expected_distance, rel=1e-2)
 
 
-class Delta_Test:
-
-    def check_function(self, function, expected_distance, expected_score=None):
-        distances = function(c1000)
-        sample = distances.at['Fontane,-Theodor_Der-Stechlin',
-                              'Fontane,-Theodor_Effi-Briest']
-        feq_(sample, expected_distance,
-             "{} Stechlin/Effi distance is {} instead of {}!".format(
-                 function.name, sample, expected_distance))
-
-        if expected_score is not None:
-            feq_(expected_score, distances.simple_score(),
-                 "{} simple score is {} instead of expected {}!".format(
-                     function.name, distances.simple_score(), expected_score))
-
-    def burrows_test(self):
-        self.check_function(d.functions.burrows, 0.7538867972199293)
-
-    def linear_test(self):
-        self.check_function(d.functions.linear, 1149.434663563308)
-
-    def quadratic_test(self):
-        self.check_function(d.functions.quadratic, 1102.845003724634)
-
-    def eder_test(self):
-        self.check_function(d.functions.eder, 0.3703309813454142)
-
-    def cosine_delta_test(self):
-        self.check_function(d.functions.cosine_delta, 0.6156353166442046)
-
-    def composite_metric_test(self):
-        mcosine = d.MetricDeltaFunction('cosine', 'mcosine')
-        assert mcosine.fix_symmetry == True, "fix_symmetry is False!?"
-        mcd = d.CompositeDeltaFunction('mcosine-z_score', 'metric_cosine_delta')
-        assert mcd.basis.fix_symmetry == True, "basis.fix_symmetry is False!?"
-        self.check_function(d.functions.metric_cosine_delta, 0.6156353166442046)
+def test_composite_metric(c1000):
+    mcosine = d.MetricDeltaFunction('cosine', 'mcosine')
+    assert mcosine.fix_symmetry == True, "fix_symmetry is False!?"
+    mcd = d.CompositeDeltaFunction('mcosine-z_score', 'metric_cosine_delta')
+    assert mcd.basis.fix_symmetry == True, "basis.fix_symmetry is False!?"
+    test_distance(d.functions.metric_cosine_delta, 0.6156353166442046, c1000)

@@ -18,3 +18,6 @@ nosetests.xml
 .python-version
 
 NOTES
+.cache
+.pytest_cache
+pytest.xml
