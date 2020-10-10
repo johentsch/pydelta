@@ -80,7 +80,7 @@ class Metadata(Mapping):
                 self._update_from(arg.metadata.__dict__)
             elif isinstance(arg, str):
                 self._update_from(json.loads(arg))
-            else:
+            elif arg is not None:
                 self._update_from(arg)
         self._update_from(kwargs)
 
