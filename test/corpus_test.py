@@ -46,10 +46,6 @@ def test_call_fg(feature_generator, testdir):
 
 ## Corpus
 
-@pytest.fixture(scope='module')
-def corpus(testdir):
-    return d.Corpus(testdir)
-
 def test_corpus_parse(corpus):
     assert corpus.und.sum() == approx(25738.0)
 

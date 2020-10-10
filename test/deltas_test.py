@@ -1,15 +1,13 @@
 from pytest import approx
 
 import delta as d
-import os
-from math import log10, pow
 import pytest
 
 
 
 @pytest.fixture(scope='module')
-def c1000(testdir):
-    return d.Corpus(testdir).get_mfw_table(1000)
+def c1000(corpus):
+    return corpus.get_mfw_table(1000)
 
 
 def fn_id(fn):
