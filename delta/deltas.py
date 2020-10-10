@@ -600,6 +600,9 @@ class MetricDeltaFunction(DeltaFunction):
 
 
 class DistanceMatrix(pd.DataFrame):
+
+    _metadata = ['metadata']
+
     """
     A distance matrix is the result of applying a :class:`DeltaFunction` to a
     :class:`Corpus`.
@@ -781,7 +784,7 @@ class DistanceMatrix(pd.DataFrame):
         Returns:
             pandas.Series: All scores implemented for distance matrixes
         """
-        result = pd.Series()
+        result = pd.Series(dtype='float64')
         result["F-Ratio"] = self.f_ratio()
         result["Fisher's LD"] = self.fisher_ld()
         result["Simple Score"] = self.simple_score()

@@ -193,7 +193,7 @@ class FlatClustering:
         Returns:
             pandas.Series: All scores for the current clustering
         """
-        result = pd.Series()
+        result = pd.Series(dtype='float64')
         result["Cluster Errors"] = self.cluster_errors()
         result["Adjusted Rand Index"] = self.adjusted_rand_index()
         result["Homogeneity"], result["Completeness"], result["V Measure"] = \

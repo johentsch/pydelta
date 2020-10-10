@@ -10,6 +10,8 @@ out of that.
 import os
 import glob
 from fnmatch import fnmatch
+from typing import Type
+
 import regex as re
 import pandas as pd
 import collections
@@ -249,6 +251,8 @@ class CorpusNotAbsolute(CorpusNotComplete):
 
 class Corpus(pd.DataFrame):
 
+    _metadata = ['metadata']
+
     def __init__(self, subdir=None, file=None, corpus=None,
                  feature_generator=FeatureGenerator(),
                  document_describer=DefaultDocumentDescriber(),
@@ -444,7 +448,7 @@ class Corpus(pd.DataFrame):
         Yields:
             Features from the given file
         """
-        ENTRY = re.compile('\s*([^#]+)')
+        ENTRY = re.compile(r'\s*([^#]+)')
         with open(filename, 'r', **kwargs) as f:
             for line in f:
                 match = ENTRY.match(line)
