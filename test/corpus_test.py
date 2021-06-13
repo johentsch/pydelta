@@ -69,3 +69,8 @@ def test_table_describer(testdir):
     corpus = d.Corpus(testdir,
                       document_describer=d.util.TableDocumentDescriber(testdir + '.csv', 'Author', 'Title'))
     assert corpus.document_describer.group_name(corpus.index[-1]) in {'Raabe', 'Marlitt', 'Fontane'}
+
+
+def test_featuredescriber_args(testdir):
+    corpus = d.Corpus(testdir, lower_case=True)
+    assert 'Sie' not in corpus.columns

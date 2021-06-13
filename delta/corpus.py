@@ -10,6 +10,7 @@ out of that.
 import os
 import glob
 from fnmatch import fnmatch
+from inspect import signature
 from typing import Type
 
 import regex as re
@@ -254,7 +255,7 @@ class Corpus(pd.DataFrame):
     _metadata = ['metadata']
 
     def __init__(self, subdir=None, file=None, corpus=None,
-                 feature_generator=FeatureGenerator(),
+                 feature_generator=None,
                  document_describer=DefaultDocumentDescriber(),
                  metadata=None, **kwargs):
         """
@@ -264,9 +265,11 @@ class Corpus(pd.DataFrame):
             subdir (str): Path to a subdirectory containing the (unprocessed) corpus data.
             file (str): Path to a CSV file containing the feature vectors.
             corpus (pandas.DataFrame): A dataframe or :class:`Corpus` from which to create a new corpus, as a copy.
-            feature_generator (FeatureGenerator): A customizeable helper class that will process a `subdir` to a feature matrix, if the `subdir` argument is also given.
+            feature_generator (FeatureGenerator): A customizeable helper class that will process a `subdir` to a feature matrix, if the `subdir` argument is also given. If None, a default feature generator will be used.
             metadata (dict): A dictionary with metadata to copy into the new corpus.
-            **kwargs: Additional keyword arguments will be set in the metadata record of the new corpus.
+            **kwargs: Additionally, if feature_generator is None and subdir is not None, you can pass FeatureGenerator
+                arguments and they will be used when instantiating the feature generator
+                Additional keyword arguments will be set in the metadata record of the new corpus.
         """
         logger = logging.getLogger(__name__)
 
@@ -290,6 +293,15 @@ class Corpus(pd.DataFrame):
 
         # initialize data
         if subdir is not None:
+            if feature_generator is None:
+                fg_sig_arguments = signature(FeatureGenerator).parameters
+                fg_actual_args = {}
+                for key, value in kwargs.copy().items():
+                    if key in fg_sig_arguments:
+                        fg_actual_args[key] = value
+                        del kwargs[key]
+                feature_generator = FeatureGenerator(**fg_actual_args)
+
             logger.info(
                 "Creating corpus by reading %s using %s",
                 subdir,
