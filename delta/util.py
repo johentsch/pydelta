@@ -7,6 +7,8 @@ import json
 from collections.abc import Mapping
 import pandas as pd
 import itertools
+import scipy.spatial.distance as ssd
+import numpy as np
 
 class MetadataException(Exception):
     pass
@@ -318,3 +320,60 @@ def ngrams(iterable, n=2, sep=None):
         return tuples
     else:
         return map(sep.join, tuples)
+
+
+def compare_pairwise(df, comparisons=None):
+    """
+    Builds a table with pairwise comparisons of specific columns in the dataframe df.
+
+    This function is intended to provide additional relative metadata to the pairwise
+    distances of a (symmetric) DistanceMatrix. It will take a dataframe and compare
+    its rows pairwise according to the second argument, returning a dataframe in the
+    'vector' form of `:func:ssd.squareform`.
+
+    If your comparisons can be expressed as np.ufuncs, this will be quite efficient.
+
+    Args:
+         df: A dataframe. rows = instances, columns = features.
+         comparisons: An iterable of comparison specs. Each spec should be either:
+
+             (a) a column name (e.g., a string)
+             (b) a tuple with 2-4 entries: (source_column, ufunc [, postfunc: callable] [, target_column: str])
+
+                 - source column is the name of the column in df to compare
+                 - ufunc is a two-argument `:class:np.ufunc` which is pairwise applied to all combinations of the column
+                 - postfunc is a one-argument function that is applied to the final, 1D result vector
+                 - target_column is the name of the column in the result dataframe (if missing, source column will be used)
+
+    Returns:
+        A dataframe. Will have a column for each `comparison` spec and a row for each pair {i, j | i != j} in df.index
+    """
+    if comparisons is None:
+        comparisons = list(df.columns)
+
+    results = {}
+    for compspec in comparisons:
+
+        # Parse arguments
+        if not isinstance(compspec, tuple):
+            col = compspec
+            ufunc = np.equal
+            postfunc = None
+            col_out = col
+        else:
+            col, ufunc = compspec[:2]
+            col_out = col
+            postfunc = None
+            if not callable(compspec[-1]):
+                col_out = compspec[-1]
+            if len(compspec) > 2 and callable(compspec[2]):
+                postfunc = compspec[2]
+
+        comparison = ufunc.outer(df[col].values, df[col].values)
+        longform = ssd.squareform(comparison, checks=False, force='tovector')
+        if postfunc is not None:
+            longform = postfunc(longform)
+        results[col_out] = longform
+
+    index = pd.MultiIndex.from_tuples(itertools.combinations(df.index, 2))
+    return pd.DataFrame(results, index=index)
