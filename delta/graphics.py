@@ -178,7 +178,11 @@ def spikeplot(corpus, docs=slice(None), features=50, figsize=None, **kwargs):
     Returns:
         the plot
     """
-    selection = corpus.ix.__getitem__((_prep_slice(docs), _prep_slice(features)))
+    if isinstance(docs, int):
+        docs = corpus.index[:docs]
+    if isinstance(features, int):
+        features = corpus.columns[:features]
+    selection = corpus.loc.__getitem__((_prep_slice(docs), _prep_slice(features)))
     if figsize is None:
         w, h = plt.rcParams.get('figure.figsize')
         figsize = [1.5*w, 0.5*h]
