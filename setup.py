@@ -24,6 +24,7 @@ setup(
         'pandas>=0.13.1',          # https://github.com/cophi-wue/pydelta/issues/6
 #        'profig>=0.2.8',
         'scikit-learn>=0.16.0',
+        'scikit-learn-extra>=0.2.0',
         'joblib>=1.0.1',
         'regex'
     ],

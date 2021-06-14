@@ -2,9 +2,6 @@
 
 Cython
 
-# FIXME Update code to work with this:
-# git+https://github.com/Kornel/scikit-learn#egg=scikit_learn
-
 pytest
 pytest-cov
 Sphinx

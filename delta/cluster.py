@@ -232,7 +232,7 @@ class FlatClustering:
         return result
 
 try:
-    from sklearn.cluster import KMedoids
+    from sklearn_extra.cluster import KMedoids
 
     class KMedoidsClustering_distances(FlatClustering):
 
@@ -241,7 +241,7 @@ try:
             super().__init__(distances, metadata, **kwargs)
             if n_clusters is None:
                 n_clusters = self.group_count
-            model = KMedoids(n_clusters=n_clusters)
+            model = KMedoids(n_clusters=n_clusters, metric='precomputed', method='pam')
             self.set_clusters(model.fit_predict(distances))
 
     class KMedoidsClustering(FlatClustering):
@@ -251,8 +251,8 @@ try:
             super().__init__(corpus, metadata, **kwargs)
             if n_clusters is None:
                 n_clusters = self.group_count
-            model = KMedoids(n_clusters=n_clusters,
-                             distance_metric=delta.metric, **extra_args)
+            model = KMedoids(n_clusters=n_clusters, method='pam',
+                             metric=delta.metric, **extra_args)
             data = delta.prepare(corpus)
             self.set_clusters(model.fit_predict(data))
 

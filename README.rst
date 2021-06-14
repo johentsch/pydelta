@@ -51,9 +51,7 @@ Developers can clone the repo and run pip to install::
     cd pydelta
     pip install -r requirements.txt
 
-This will also install a version of scikit-learn that features
-k-Medoids-Clustering which is not in the official version yet. You may need to
-install numpy, scipy, and Cython separately first.
+You may need to install numpy, scipy, and Cython separately first.
 
 
 ----
