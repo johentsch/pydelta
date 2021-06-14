@@ -654,17 +654,17 @@ class DistanceMatrix(pd.DataFrame):
 
     def _remove_duplicates(self):
         """
-        Returns a DistanceMatrix that has only the upper right triangle filled,
+        Returns a DistanceMatrix that has only the lower left triangle filled,
         ie contains only the unique meaningful values.
         """
-        return DistanceMatrix(self.where(np.triu(np.ones(self.shape, dtype=bool),
-                                                 k=1)),
+        return DistanceMatrix(self.where(np.tril(np.ones(self.shape, dtype=bool),
+                                                 k=-1)),
                               copy_from=self)
 
     def delta_values(self):
         r"""
         Converts the given n×n Delta matrix to a :math:`\binom{n}{2}` long
-        series of distinct delta values – i.e. duplicates from the lower
+        series of distinct delta values – i.e. duplicates from the upper
         triangle and zeros from the diagonal are removed.
         """
         return self._remove_duplicates().unstack().dropna()
