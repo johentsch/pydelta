@@ -26,6 +26,10 @@ def test_distance(function, expected_distance, c1000):
     assert sample == approx(expected_distance, rel=1e-2)
 
 
+def test_simple_score(distances):
+    assert distances.simple_score() > 0
+
+
 def test_composite_metric(c1000):
     mcosine = d.MetricDeltaFunction('cosine', 'mcosine')
     assert mcosine.fix_symmetry == True, "fix_symmetry is False!?"

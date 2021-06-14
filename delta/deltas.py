@@ -652,22 +652,31 @@ class DistanceMatrix(pd.DataFrame):
         self.to_csv(filename)
         self.metadata.save(filename)
 
-    def _remove_duplicates(self):
+    def _remove_duplicates(self, transpose=False, check=True):
         """
         Returns a DistanceMatrix that has only the lower left triangle filled,
         ie contains only the unique meaningful values.
         """
-        return DistanceMatrix(self.where(np.tril(np.ones(self.shape, dtype=bool),
+        df = self.T if transpose else self
+        result = DistanceMatrix(df.where(np.tril(np.ones(self.shape, dtype=bool),
                                                  k=-1)),
                               copy_from=self)
+        if check and result.isna().sum().sum() > 0 and self.notna().sum().sum() > 0:
+            return self._remove_duplicates(transpose=not transpose, check=False)
+        return result
 
-    def delta_values(self):
+    def delta_values(self, transpose=False, check=True):
         r"""
         Converts the given n×n Delta matrix to a :math:`\binom{n}{2}` long
         series of distinct delta values – i.e. duplicates from the upper
         triangle and zeros from the diagonal are removed.
+
+        Args:
+            transpose: if True, transpose the dataframe first, i.e. use the upper right triangle
+            check: if True and if the result does not contain any non-null value, try the other
+                   option for transpose.
         """
-        return self._remove_duplicates().unstack().dropna()
+        return self._remove_duplicates(transpose, check).unstack().dropna()
 
     def delta_values_df(self):
         """
@@ -773,8 +782,8 @@ class DistanceMatrix(pd.DataFrame):
         different than equal authors.
         """
         in_group_df, out_group_df = self.z_scores().partition()
-        in_group, out_group = (in_group_df.delta_values(),
-                               out_group_df.delta_values())
+        in_group, out_group = (in_group_df.delta_values(transpose=True, check=False),
+                               out_group_df.delta_values(transpose=True, check=False))
         score = out_group.mean() - in_group.mean()
         return score
 
