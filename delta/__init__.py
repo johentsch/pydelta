@@ -20,16 +20,18 @@ from delta.cluster import Clustering, FlatClustering
 
 from delta.features import get_rfe_features
 from delta.graphics import Dendrogram
+from delta.util import compare_pairwise, Metadata, TableDocumentDescriber
 
-__all__ = [ Corpus, FeatureGenerator, LETTERS_PATTERN, WORD_PATTERN,
-           functions, Normalization, normalization,
-           DeltaFunction, PDistDeltaFunction,
-           MetricDeltaFunction, CompositeDeltaFunction,
-           Clustering, FlatClustering,
-           get_rfe_features, Dendrogram ]
+__all__ = [ "Corpus", "FeatureGenerator", "LETTERS_PATTERN", "WORD_PATTERN",
+           "functions", "Normalization", "normalization",
+           "DeltaFunction", "PDistDeltaFunction",
+           "MetricDeltaFunction", "CompositeDeltaFunction",
+           "Clustering", "FlatClustering",
+           "get_rfe_features", "Dendrogram",
+           "compare_pairwise", "Metadata", "TableDocumentDescriber" ]
 
 try:
         from delta.cluster import KMedoidsClustering
-        __all__.append(KMedoidsClustering)
+        __all__.append("KMedoidsClustering")
 except (ImportError, NameError):
         warn("KMedoidsClustering not available")
