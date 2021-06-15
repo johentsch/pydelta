@@ -1,9 +1,0 @@
--e .
-
-Cython
-
-pytest
-pytest-cov
-Sphinx
-ipykernel
-nbsphinx

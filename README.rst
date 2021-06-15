@@ -37,7 +37,7 @@ There are currently three different long-running branches:
 Installation and Requirements
 =============================
 
-PyDelta requires **Python 3.3 or newer**. It has quite a set of dependencies (NumPy, Pandas, SciPy, SciKit-Learn, …), but it comes with a setup script that installs it with its dependencies.
+PyDelta requires **an up-to-date Python 3**. It has quite a set of dependencies (NumPy, Pandas, SciPy, SciKit-Learn, …) that are declared in its pyproject.toml.
 
 If you only wish to use it, not to hack on it, pip can clone and install it for you::
 
@@ -45,13 +45,14 @@ If you only wish to use it, not to hack on it, pip can clone and install it for 
 
 (Note that the Python 3 version of pip is sometimes called ``pip3``).
 
-Developers can clone the repo and run pip to install::
+Developers can clone the repo and use [Poetry](https://python-poetry.org/) to setup a virtual environment for development.
 
     git clone -b next https://github.com/cophi-wue/pydelta
     cd pydelta
-    pip install -r requirements.txt
+    poetry install
 
-You may need to install numpy, scipy, and Cython separately first.
+Tests can be run using `pytest`. To build the documentation `cd docs && make html`.
+
 
 
 ----

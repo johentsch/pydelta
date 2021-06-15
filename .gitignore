@@ -21,3 +21,4 @@ NOTES
 .cache
 .pytest_cache
 pytest.xml
+poetry.lock
