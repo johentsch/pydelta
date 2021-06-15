@@ -29,7 +29,6 @@ nbsphinx = "^0.8.6"
 
 [tool.pytest.ini_options]
 addopts = "--doctest-modules --junit-xml pytest.xml"
-nb_diff_ignore = "/cells/*/output"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
