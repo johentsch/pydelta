@@ -9,7 +9,7 @@ out of that.
 
 import os
 import glob
-from collections import Mapping
+from collections.abc import Mapping
 from fnmatch import fnmatch
 from inspect import signature
 from typing import Type
