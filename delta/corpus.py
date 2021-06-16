@@ -277,14 +277,33 @@ class Corpus(pd.DataFrame):
 
     _metadata = ['metadata']
 
-    def __init__(self, subdir=None, file=None, corpus=None,
+    def __init__(self, source=None, /, *, subdir=None, file=None, corpus=None,
                  feature_generator=None,
                  document_describer=DefaultDocumentDescriber(),
                  metadata=None, **kwargs):
         """
         Creates a new Corpus.
 
+        You can create a corpus either from a filesystem subdir with raw text files, or from a CSV file with
+        a document-term matrix, or from another corpus or dataframe that contains (potentially preprocessed)
+        document/term vectors. Either option may be passed via appropriately named keyword argument or as
+        the only positional argument, but exactly one must be present.
+
+        If you pass a subdirectory, Corpus will call a `FeatureGenerator` to read and parse the files and to
+        generate a default word count. The default implementation will search for plain text files ``*.txt``
+        inside the directory and parse them using a simple regular expression. It has a few options, e.g.,
+        ``glob`` and ``lower_case``, that can also be passed directly to corpus as keyword arguments. E.g.,
+        ``Corpus('texts', glob='plain-*.txt', lower_case=True)`` will look for files called plain-xxx.txt and
+        convert it to lower case before tokenizing. See `FeatureGenerator` for more details.
+
+        The ``document_describer`` can contain per-document metadata which can be used, e.g, as ground truth.
+
+        The ``metadata`` record contains global metadata (e.g., which transformations have already been performed),
+        they will be inherited from a ``corpus`` argument, all additional keyword arguments will be included
+        with this record.
+
         Args:
+            source: Positional variant of either subdir, file, or corpus
             subdir (str): Path to a subdirectory containing the (unprocessed) corpus data.
             file (str): Path to a CSV file containing the feature vectors.
             corpus (pandas.DataFrame): A dataframe or :class:`Corpus` from which to create a new corpus, as a copy.
@@ -296,12 +315,18 @@ class Corpus(pd.DataFrame):
         """
         logger = logging.getLogger(__name__)
 
-        # normalize the source stuff
-        if subdir is not None:
-            if isinstance(subdir, pd.DataFrame):
-                subdir, corpus = None, subdir
-            elif os.path.isfile(subdir):
-                subdir, file = None, subdir
+        # Check and normalize the parameters so we have either file or subdir or corpus != None
+        if sum(1 for arg in [source, subdir, file, corpus] if arg is not None) != 1:
+            raise ValueError('Exactly one of the positional argument, subdir, file or corpus must be present')
+        if source is not None:
+            if isinstance(source, str) or isinstance(source, os.PathLike):
+                if os.path.isfile(source):
+                    file = source
+                else:
+                    subdir = source
+            else:
+                corpus = source
+
 
         # initialize or update metadata
         if metadata is None:
@@ -316,13 +341,13 @@ class Corpus(pd.DataFrame):
 
         # initialize data
         if subdir is not None:
-            if feature_generator is None:
+            if feature_generator is None:       # generate default feature generator from matching args
                 fg_sig_arguments = signature(FeatureGenerator).parameters
                 fg_actual_args = {}
                 for key, value in kwargs.copy().items():
                     if key in fg_sig_arguments:
                         fg_actual_args[key] = value
-                        del kwargs[key]
+                        del kwargs[key]        # if they belong in metadata, FeatureGenerator will put them there
                 feature_generator = FeatureGenerator(**fg_actual_args)
 
             logger.info(
@@ -347,9 +372,10 @@ class Corpus(pd.DataFrame):
             df = corpus
             if isinstance(corpus, Corpus):
                 metadata.update(corpus.metadata)
+            elif not isinstance(corpus, pd.DataFrame):
+                df = pd.DataFrame(df)
         else:
-            raise ValueError(
-                "Error. Only one of subdir and corpusfile can be not None")
+            assert False, 'we already checked above that one of corpus, file, or subdir is not None'
 
         metadata.update(**kwargs)
 
