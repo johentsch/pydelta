@@ -4,6 +4,8 @@ Various visualization tools.
 """
 
 import logging
+from collections import Sequence
+
 logger = logging.getLogger(__name__)
 
 import scipy.cluster.hierarchy as sch
@@ -152,19 +154,40 @@ def scatterplot_delta(deltas,
     plt.legend()
     return plt.gca()
 
-def _prep_slice(arg):
-    """
-    Prepare an argument to be passed to an indexer's __getitem__.
 
-    Arg can be none (``:``), an list (passed through), a slice (passed
-    through), or sth else like an integer (``:n``)
+def _ix_lookup(arg, index):
+    """
+    Implements the special index lookup for `spikeplot`s ``features`` and ``docs``.
+
+    Args:
+        index: a pandas index that must not be an integer index
+        arg: None, an int (meaning ``[:arg]``) or a slice.
+
+    Examples:
+        >>> import pandas as pd
+        >>> idx = pd.Index(['a', 'b', 'c'])
+        >>> _ix_lookup(None, idx)
+        slice(None, None, None)
+        >>> _ix_lookup(2, idx)
+        Index(['a', 'b'], dtype='object')
+        >>> _ix_lookup([0,2], idx)
+        Index(['a', 'c'], dtype='object')
     """
     if arg is None:
-        return slice(None)
+        result = slice(None)
     elif isinstance(arg, Iterable) or isinstance(arg, slice):
-        return arg
+        result = arg
     else:
-        return slice(arg)
+        result = slice(arg)
+    slice_ = result
+    if isinstance(slice_, int):
+        return index[:slice_]
+    elif isinstance(slice_, slice) and any(isinstance(s, int) for s in (slice_.start, slice_.stop, slice_.step)):
+        return index.__getitem__(slice_)
+    elif isinstance(slice_, Sequence) and any(isinstance(s, int) for s in slice_):
+        return index[slice_]
+    else:
+        return slice_
 
 def spikeplot(corpus, docs=slice(None), features=50, figsize=None, **kwargs):
     """
@@ -175,14 +198,19 @@ def spikeplot(corpus, docs=slice(None), features=50, figsize=None, **kwargs):
         docs (int, list or slice): the documents to include in the plot, default: all documents
         features (int, list, or slice): the features to plot, default: top 50 features
         figsize (2-element list): size of the plot
+        kwargs: will be passed on to :meth:`pd.DataFrame.plot`
+
+    Notes:
+        The arguments docs and features can by either:
+        * None, selecting all items
+        * something you would put into corpus.index[·] or corpus.columns[·], respectively; i.e. a label indexer
+        * an integer, selecting the first n items
+        * a list of integers, selecting exactly those items
+
     Returns:
         the plot
     """
-    if isinstance(docs, int):
-        docs = corpus.index[:docs]
-    if isinstance(features, int):
-        features = corpus.columns[:features]
-    selection = corpus.loc.__getitem__((_prep_slice(docs), _prep_slice(features)))
+    selection = corpus.loc.__getitem__((_ix_lookup(docs, corpus.index), _ix_lookup(features, corpus.columns)))
     if figsize is None:
         w, h = plt.rcParams.get('figure.figsize')
         figsize = [1.5*w, 0.5*h]
