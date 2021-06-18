@@ -54,7 +54,7 @@ except ImportError:
     from scipy.special import comb
 from itertools import combinations
 from functools import update_wrapper
-from .util import Metadata
+from .util import Metadata, compare_pairwise
 from .corpus import Corpus
 from textwrap import dedent
 from sklearn.metrics import pairwise_distances
@@ -676,7 +676,9 @@ class DistanceMatrix(pd.DataFrame):
             check: if True and if the result does not contain any non-null value, try the other
                    option for transpose.
         """
-        return self._remove_duplicates(transpose, check).unstack().dropna()
+        result = self._remove_duplicates(transpose, check).unstack().dropna()
+        result.name = self.metadata.get('delta')
+        return result
 
     def delta_values_df(self):
         """
@@ -798,6 +800,21 @@ class DistanceMatrix(pd.DataFrame):
         result["Fisher's LD"] = self.fisher_ld()
         result["Simple Score"] = self.simple_score()
         return result
+
+    def compare_with(self, doc_metadata, comparisons=None, join='inner'):
+        """
+        Compare the distance matrix value with values calculated from the given document metadata table.
+
+        Args:
+            doc_metadata (pd.DataFrame): a dataframe with one row per document and arbitrary columns
+            comparisons: see `compare_pairwise`
+            join (str): inner (the default) or outer, if outer, keep pairs for which we have neither metadata nor comparisons.
+
+        Returns:
+            a dataframe with a row for each pairwise document combination (as in `DistanceMatrix.delta_values`).
+            The first column will contain the delta values, subsequent columns the metadata comparisons.
+        """
+        return pd.concat([self.delta_values(), compare_pairwise(doc_metadata, comparisons)], join=join, axis=1)
 
 
 
