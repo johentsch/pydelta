@@ -335,9 +335,11 @@ def compare_pairwise(df, comparisons=None):
 
     Args:
          df: A dataframe. rows = instances, columns = features.
-         comparisons: An iterable of comparison specs. Each spec should be either:
+         comparisons: A list of comparison specs. Each spec should be either:
 
-             (a) a column name (e.g., a string)
+             (a) a column name (e.g., a string) for default settings: The absolute difference (np.subtract)
+                 for numerical columns, np.equal for everything else
+
              (b) a tuple with 2-4 entries: (source_column, ufunc [, postfunc: callable] [, target_column: str])
 
                  - source column is the name of the column in df to compare
@@ -345,8 +347,24 @@ def compare_pairwise(df, comparisons=None):
                  - postfunc is a one-argument function that is applied to the final, 1D result vector
                  - target_column is the name of the column in the result dataframe (if missing, source column will be used)
 
+        If comparisons is missing, a default comparison will be created for every column
+
     Returns:
-        A dataframe. Will have a column for each `comparison` spec and a row for each pair {i, j | i != j} in df.index
+        A dataframe. Will have a column for each `comparison` spec and a row for each unique pair in the index.
+        The order of rows will be similar to [(i, j) for i in 0..(n-1) for j in (i+1)..(n-1)].
+
+    Example:
+        >>> df = pd.DataFrame({'Class': ['a', 'a', 'b'], 'Size': [42, 30, 5]})
+        >>> compare_pairwise(df)
+             Class  Size
+        0 1   True    12
+          2  False    37
+        1 2  False    25
+        >>> compare_pairwise(df, ['Class', ('Size', np.subtract, np.absolute, 'Size_Diff'), ('Size', np.add, 'Size_Total')])
+             Class  Size_Diff  Size_Total
+        0 1   True         12          72
+          2  False         37          47
+        1 2  False         25          35
     """
     if comparisons is None:
         comparisons = list(df.columns)
@@ -357,8 +375,12 @@ def compare_pairwise(df, comparisons=None):
         # Parse arguments
         if not isinstance(compspec, tuple):
             col = compspec
-            ufunc = np.equal
-            postfunc = None
+            if pd.api.types.is_numeric_dtype(df.dtypes[col]):
+                ufunc = np.subtract
+                postfunc = np.absolute
+            else:
+                ufunc = np.equal
+                postfunc = None
             col_out = col
         else:
             col, ufunc = compspec[:2]
@@ -369,6 +391,8 @@ def compare_pairwise(df, comparisons=None):
             if len(compspec) > 2 and callable(compspec[2]):
                 postfunc = compspec[2]
 
+        if not hasattr(ufunc, 'outer'):
+            raise TypeError(f'Column "{col}": Function {ufunc} does not have an .outer function. Try np.frompyfunc(fn, 2, 1)')
         comparison = ufunc.outer(df[col].values, df[col].values)
         longform = ssd.squareform(comparison, checks=False, force='tovector')
         if postfunc is not None:
