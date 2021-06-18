@@ -26,9 +26,15 @@ pytest-cov = "^2.12.1"
 Sphinx = "^4.0.2"
 ipykernel = "^5.5.5"
 nbsphinx = "^0.8.6"
+pytest-notebook = "^0.6.1"
+# jupyter-client versions >=6.1.13,<7.0 exhibit a bug with pytest-notebook and have
+# been yanked <https://github.com/jupyter/jupyter_client/issues/637>, but poetry
+# does not support yanked packages yet, so until jupyter-client 7 is released:
+jupyter-client = "<6.1.13"
 
 [tool.pytest.ini_options]
 addopts = "--doctest-modules --junit-xml pytest.xml --cov=delta --cov-report=html --cov-report=xml"
+nb_diff_ignore = "/cells/*/outputs"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
