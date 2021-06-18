@@ -4,7 +4,6 @@ Various visualization tools.
 """
 
 import logging
-from collections import Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +12,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from sklearn import manifold, decomposition
 from sklearn.base import TransformerMixin
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 
 
 class Dendrogram:
