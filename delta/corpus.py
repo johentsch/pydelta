@@ -277,7 +277,7 @@ class Corpus(pd.DataFrame):
 
     _metadata = ['metadata']
 
-    def __init__(self, source=None, /, *, subdir=None, file=None, corpus=None,
+    def __init__(self, source=None, *, subdir=None, file=None, corpus=None,
                  feature_generator=None,
                  document_describer=DefaultDocumentDescriber(),
                  metadata=None, **kwargs):
@@ -304,6 +304,8 @@ class Corpus(pd.DataFrame):
 
         Args:
             source: Positional variant of either subdir, file, or corpus
+
+        Keyword Args:
             subdir (str): Path to a subdirectory containing the (unprocessed) corpus data.
             file (str): Path to a CSV file containing the feature vectors.
             corpus (pandas.DataFrame): A dataframe or :class:`Corpus` from which to create a new corpus, as a copy.
@@ -312,6 +314,10 @@ class Corpus(pd.DataFrame):
             **kwargs: Additionally, if feature_generator is None and subdir is not None, you can pass FeatureGenerator
                 arguments and they will be used when instantiating the feature generator
                 Additional keyword arguments will be set in the metadata record of the new corpus.
+
+        Warning:
+            You should either use a single positional argument (source) or one of subdir, file, or corpus as
+            keyword arguments.  In future versions, source will be positional-only.
         """
         logger = logging.getLogger(__name__)
 
