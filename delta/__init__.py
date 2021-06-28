@@ -6,6 +6,7 @@ pydelta library
 
 Stylometrics in Python
 """
+import warnings
 
 try:
     import importlib.metadata as importlib_metadata
@@ -13,7 +14,11 @@ except ModuleNotFoundError: # < Python 3.8
     import importlib_metadata
 
 __title__ = 'delta'
-__version__ = importlib_metadata.version(__name__)
+try:
+    __version__ = importlib_metadata.version(__name__)
+except Exception as e:
+    __version__ = None
+    warnings.warn(f'Could not determine version: {e}', ImportWarning, source=e)
 __author__ = 'Fotis Jannidis, Thorsten Vitt'
 
 from warnings import warn
