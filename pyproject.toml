@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "delta"
-version = "2.1.0.dev1"
+version = "2.2.0.dev0"
 description = "Stylometry toolkit"
 authors = [
     "Thorsten Vitt <thorsten.vitt@uni-wuerzburg.de>",
@@ -34,7 +34,7 @@ pytest-notebook = "^0.6.1"
 jupyter-client = "<6.1.13"
 
 [tool.pytest.ini_options]
-addopts = "--doctest-modules --junit-xml pytest.xml --cov=delta --cov-report=html --cov-report=xml"
+addopts = "--doctest-modules --junit-xml pytest.xml --cov-report=html --cov-report=xml"
 nb_diff_ignore = "/cells/*/outputs"
 
 [build-system]
