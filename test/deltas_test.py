@@ -1,8 +1,11 @@
+import pandas as pd
 from pytest import approx
+from scipy.special import comb
 
 import delta as d
 import pytest
 
+from delta.deltas import DistanceMatrix
 
 
 @pytest.fixture(scope='module')
@@ -36,3 +39,13 @@ def test_composite_metric(c1000):
     mcd = d.CompositeDeltaFunction('mcosine-z_score', 'metric_cosine_delta')
     assert mcd.basis.fix_symmetry == True, "basis.fix_symmetry is False!?"
     test_distance(d.functions.metric_cosine_delta, 0.6156353166442046, c1000)
+
+
+def test_delta_values_shape(distances: DistanceMatrix):
+    dv = distances.delta_values()
+    assert len(dv) == comb(distances.shape[0], 2)
+
+def test_compare_with_shape(distances: DistanceMatrix, testdir):
+    metadata = pd.read_csv(testdir + '.csv', index_col=0)
+    comparison = distances.compare_with(metadata)
+    assert comparison.shape[0] == comb(distances.shape[0], 2)
