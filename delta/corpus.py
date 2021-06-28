@@ -66,8 +66,8 @@ class FeatureGenerator(object):
                  token_pattern=LETTERS_PATTERN,
                  max_tokens=None,
                  ngrams=None,
-                 parallel=False
-                 ):
+                 parallel=False,
+                 sort='documents'):
         """
         Creates a customized default feature generator.
 
@@ -85,10 +85,15 @@ class FeatureGenerator(object):
                 regular expressions*) that contains at least one letter.
             max_tokens (int): If set, stop reading each file after that many words.
             ngrams (int): Count token ngrams instead of single tokens
-            parallel(bool|int|Parallel): If truish, read and parse files in parallel. The actual argument may be
+            parallel(bool, int, Parallel): If truish, read and parse files in parallel. The actual argument may be
                 - None or False for no special processing
                 - an int for the required number of jobs
                 - a dictionary with Parallel arguments for finer control
+            sort (str): Sort the final feature matrix by index before returning. Possible values:
+                - ``documents``, ``index``: Sort by document names
+                - ``features``, ``columns``: sort by feature labels (ie words)
+                - ``both``: sort along both axes
+                - None or the empty string: Do not sort
         """
         self.lower_case = lower_case
         self.encoding = encoding
@@ -99,6 +104,7 @@ class FeatureGenerator(object):
         self.ngrams = ngrams
         self.logger = logging.getLogger(__name__)
         self.parallel = parallel
+        self.sort = sort
 
     def __repr__(self):
         return type(self).__name__ + '(' + \
@@ -248,10 +254,16 @@ class FeatureGenerator(object):
     def __call__(self, directory):
         """
         Runs the feature extraction using :meth:`process_directory` for the
-        given directory and returns a simple, unsorted pd.DataFrame for that.
+        given directory and returns a simple pd.DataFrame for that. The resulting
+        dataframe will be sorted according to the `sort` attribute.
         """
-        df = pd.DataFrame(self.process_directory(directory))
-        return df.T
+        df = pd.DataFrame(self.process_directory(directory)).T
+        if self.sort:
+            if self.sort.lower() in {'documents', 'index', 'both'}:
+                df = df.sort_index(axis=0)
+            if self.sort.lower() in {'features', 'columns', 'both'}:
+                df = df.sort_index(axis=1)
+        return df
 
     @property
     def metadata(self):
