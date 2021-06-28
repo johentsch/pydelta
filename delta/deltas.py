@@ -654,13 +654,11 @@ class DistanceMatrix(pd.DataFrame):
 
     def _remove_duplicates(self, transpose=False, check=True):
         """
-        Returns a DistanceMatrix that has only the lower left triangle filled,
+        Returns a DistanceMatrix that has only the upper right triangle filled,
         ie contains only the unique meaningful values.
         """
         df = self.T if transpose else self
-        result = DistanceMatrix(df.where(np.tril(np.ones(self.shape, dtype=bool),
-                                                 k=-1)),
-                              copy_from=self)
+        result = DistanceMatrix(df.where(np.triu(np.ones(self.shape, dtype=bool), k=1)), copy_from=self)
         if check and result.isna().sum().sum() > 0 and self.notna().sum().sum() > 0:
             return self._remove_duplicates(transpose=not transpose, check=False)
         return result
@@ -676,13 +674,13 @@ class DistanceMatrix(pd.DataFrame):
             check: if True and if the result does not contain any non-null value, try the other
                    option for transpose.
         """
-        result = self._remove_duplicates(transpose, check).unstack().dropna()
+        result = self._remove_duplicates(transpose, check).stack()
         result.name = self.metadata.get('delta')
         return result
 
     def delta_values_df(self):
         """
-        Returns an unstacked form of the given delta table along with
+        Returns an stacked form of the given delta table along with
         additional metadata. Assumes delta is symmetric.
 
         The dataframe returned has the columns Author1, Author2, Text1, Text2,
@@ -784,8 +782,8 @@ class DistanceMatrix(pd.DataFrame):
         different than equal authors.
         """
         in_group_df, out_group_df = self.z_scores().partition()
-        in_group, out_group = (in_group_df.delta_values(transpose=True, check=False),
-                               out_group_df.delta_values(transpose=True, check=False))
+        in_group, out_group = (in_group_df.delta_values(check=False),
+                               out_group_df.delta_values(check=False))
         score = out_group.mean() - in_group.mean()
         return score
 
