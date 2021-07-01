@@ -29,7 +29,7 @@ import logging
 LETTERS_PATTERN = re.compile(r'\p{L}+')
 WORD_PATTERN = re.compile(r"\b(\p{L}[\p{L}'’]*?|[\p{L}'’]*?\p{L})\b", re.WORD)
 
-class FeatureGenerator(object):
+class FeatureGenerator:
 
     """
     A **feature generator** is responsible for converting a subdirectory of
@@ -67,7 +67,8 @@ class FeatureGenerator(object):
                  max_tokens=None,
                  ngrams=None,
                  parallel=False,
-                 sort='documents'):
+                 sort='documents',
+                 sparse=False):
         """
         Creates a customized default feature generator.
 
@@ -94,6 +95,7 @@ class FeatureGenerator(object):
                 - ``features``, ``columns``: sort by feature labels (ie words)
                 - ``both``: sort along both axes
                 - None or the empty string: Do not sort
+            sparse (bool): build a sparse dataframe. Requires Pandas >=1.0
         """
         self.lower_case = lower_case
         self.encoding = encoding
@@ -105,6 +107,7 @@ class FeatureGenerator(object):
         self.logger = logging.getLogger(__name__)
         self.parallel = parallel
         self.sort = sort
+        self.sparse = sparse
 
     def __repr__(self):
         return type(self).__name__ + '(' + \
@@ -257,7 +260,12 @@ class FeatureGenerator(object):
         given directory and returns a simple pd.DataFrame for that. The resulting
         dataframe will be sorted according to the `sort` attribute.
         """
-        df = pd.DataFrame(self.process_directory(directory)).T
+        data = self.process_directory(directory)
+        if self.sparse:
+            dtype = pd.SparseDtype(pd.Int64Dtype, pd.NA)
+        else:
+            dtype = pd.Int64Dtype
+        df = pd.DataFrame.from_dict(data, orient='index', dtype=dtype)
         if self.sort:
             if self.sort.lower() in {'documents', 'index', 'both'}:
                 df = df.sort_index(axis=0)
