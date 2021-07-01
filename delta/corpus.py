@@ -283,6 +283,39 @@ class FeatureGenerator:
         return Metadata(features='words', lower_case=self.lower_case)
 
 
+class _NamedCounter(collections.Counter):
+
+    def __init__(self, iterable=None, _name='', **kwds):
+        super().__init__(iterable, **kwds)
+        self.name = _name
+
+
+class SimpleFeatureGenerator(FeatureGenerator):
+    """
+    A simplified, faster version of the FeatureGenerator.
+
+    With respect to feature generation the behaviour is the same as with FeatureGenerator, but it is slightly less
+    flexible with respect to subclassing. It does not read the files linewise, and it never creates pd.Series().
+    """
+
+    def preprocess_text(self, text):
+        if self.lower_case:
+            return text.lower()
+        else:
+            return text
+
+    def postprocess_tokens(self, tokens):
+        if self.ngrams:
+            tokens = ngrams(tokens, n=self.ngrams, sep=" ")
+        return tokens
+
+    def process_file(self, filename):
+        with open(filename, encoding=self.encoding) as f:
+            text = self.preprocess_text(f.read())
+            tokens = self.postprocess_tokens(self.tokenize([text]))
+            return _NamedCounter(tokens, self.get_name(filename))
+
+
 class CorpusNotComplete(ValueError):
     def __init__(self, msg="Corpus not complete anymore"):
         super().__init__(msg)
@@ -368,13 +401,13 @@ class Corpus(pd.DataFrame):
         # initialize data
         if subdir is not None:
             if feature_generator is None:       # generate default feature generator from matching args
-                fg_sig_arguments = signature(FeatureGenerator).parameters
+                fg_sig_arguments = signature(SimpleFeatureGenerator).parameters
                 fg_actual_args = {}
                 for key, value in kwargs.copy().items():
                     if key in fg_sig_arguments:
                         fg_actual_args[key] = value
                         del kwargs[key]        # if they belong in metadata, FeatureGenerator will put them there
-                feature_generator = FeatureGenerator(**fg_actual_args)
+                feature_generator = SimpleFeatureGenerator(**fg_actual_args)
 
             logger.info(
                 "Creating corpus by reading %s using %s",
