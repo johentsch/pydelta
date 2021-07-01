@@ -10,9 +10,10 @@ out of that.
 import os
 import glob
 from collections.abc import Mapping
+from dataclasses import dataclass
 from fnmatch import fnmatch
 from inspect import signature
-from typing import Type
+from typing import Optional, Union
 
 import regex as re
 import pandas as pd
@@ -25,12 +26,12 @@ from joblib import Parallel, delayed
 
 import logging
 
-
 LETTERS_PATTERN = re.compile(r'\p{L}+')
 WORD_PATTERN = re.compile(r"\b(\p{L}[\p{L}'’]*?|[\p{L}'’]*?\p{L})\b", re.WORD)
 
-class FeatureGenerator:
 
+@dataclass(frozen=True)
+class FeatureGenerator:
     """
     A **feature generator** is responsible for converting a subdirectory of
     files into a feature matrix (that will then become a corpus). If you need
@@ -59,61 +60,45 @@ class FeatureGenerator:
 
     So, if you wish to write a completely new feature generator, you can ignore
     the other methods.
+
+
+    Args:
+        lower_case (bool): if ``True``, normalize all tokens to lower case
+            before counting them
+        encoding (str): the encoding to use when reading files
+        glob (str): the pattern inside the subdirectory to find files.
+        skip (str): don't handle files that match this pattern
+        token_pattern (re.Regex): The regular expression used to identify
+            tokens. The default, LETTERS_PATTERN, will simply find sequences
+            of unicode letters. WORD_PATTERN will find the shortest sequence
+            of letters and apostrophes between two word boundaries
+            (according to the simple word-boundary algorithm from *Unicode
+            regular expressions*) that contains at least one letter.
+        max_tokens (int): If set, stop reading each file after that many words.
+        ngrams (int): Count token ngrams instead of single tokens
+        parallel(bool, int, Parallel): If truish, read and parse files in parallel. The actual argument may be
+            - None or False for no special processing
+            - an int for the required number of jobs
+            - a dictionary with Parallel arguments for finer control
+        sort (str): Sort the final feature matrix by index before returning. Possible values:
+            - ``documents``, ``index``: Sort by document names
+            - ``features``, ``columns``: sort by feature labels (ie words)
+            - ``both``: sort along both axes
+            - None or the empty string: Do not sort
+        sparse (bool): build a sparse dataframe. Requires Pandas >=1.0
     """
 
-    def __init__(self, lower_case=False, encoding="utf-8", glob='*.txt',
-                 skip=None,
-                 token_pattern=LETTERS_PATTERN,
-                 max_tokens=None,
-                 ngrams=None,
-                 parallel=False,
-                 sort='documents',
-                 sparse=False):
-        """
-        Creates a customized default feature generator.
-
-        Args:
-            lower_case (bool): if ``True``, normalize all tokens to lower case
-                before counting them
-            encoding (str): the encoding to use when reading files
-            glob (str): the pattern inside the subdirectory to find files.
-            skip (str): don't handle files that match this pattern
-            token_pattern (re.Regex): The regular expression used to identify
-                tokens. The default, LETTERS_PATTERN, will simply find sequences
-                of unicode letters. WORD_PATTERN will find the shortest sequence
-                of letters and apostrophes between two word boundaries
-                (according to the simple word-boundary algorithm from *Unicode
-                regular expressions*) that contains at least one letter.
-            max_tokens (int): If set, stop reading each file after that many words.
-            ngrams (int): Count token ngrams instead of single tokens
-            parallel(bool, int, Parallel): If truish, read and parse files in parallel. The actual argument may be
-                - None or False for no special processing
-                - an int for the required number of jobs
-                - a dictionary with Parallel arguments for finer control
-            sort (str): Sort the final feature matrix by index before returning. Possible values:
-                - ``documents``, ``index``: Sort by document names
-                - ``features``, ``columns``: sort by feature labels (ie words)
-                - ``both``: sort along both axes
-                - None or the empty string: Do not sort
-            sparse (bool): build a sparse dataframe. Requires Pandas >=1.0
-        """
-        self.lower_case = lower_case
-        self.encoding = encoding
-        self.glob = glob
-        self.skip = skip
-        self.token_pattern = token_pattern
-        self.max_tokens = max_tokens
-        self.ngrams = ngrams
-        self.logger = logging.getLogger(__name__)
-        self.parallel = parallel
-        self.sort = sort
-        self.sparse = sparse
-
-    def __repr__(self):
-        return type(self).__name__ + '(' + \
-            ', '.join(key+'='+repr(value)
-                      for key, value in self.__dict__.items() if key != 'logger') + \
-            ')'
+    lower_case: bool = False
+    encoding: str = "utf-8"
+    glob: str = "*.txt"
+    skip: Optional[str] = None
+    token_pattern: re.Pattern = LETTERS_PATTERN
+    max_tokens: Optional[int] = None
+    ngrams: Optional[int] = None
+    parallel: Union[int, bool, Parallel] = False
+    sort: str = 'documents'
+    sparse: bool = False
+    logger = logging.getLogger(__name__ + '.FeatureGenerator')
 
     def tokenize(self, lines):
         """
@@ -160,7 +145,6 @@ class FeatureGenerator:
             tokens = ngrams(tokens, n=self.ngrams, sep=" ")
 
         return tokens
-
 
     def count_tokens(self, lines):
         """
@@ -227,16 +211,16 @@ class FeatureGenerator:
         filenames = glob.glob(os.path.join(directory, self.glob))
         if len(filenames) == 0:
             self.logger.error(
-                "No files matching %s in %s. Feature matrix will be empty.",
-                self.glob,
-                directory)
+                    "No files matching %s in %s. Feature matrix will be empty.",
+                    self.glob,
+                    directory)
         else:
             self.logger.info(
-                "Reading %d files matching %s from %s",
-                len(filenames),
-                self.glob,
-                directory)
-        used_filenames = [filename for filename in filenames if self.skip is None or not(fnmatch(filename, self.skip))]
+                    "Reading %d files matching %s from %s",
+                    len(filenames),
+                    self.glob,
+                    directory)
+        used_filenames = [filename for filename in filenames if self.skip is None or not (fnmatch(filename, self.skip))]
         parallel = self._get_parallel_executor()
         if parallel:
             data = parallel(delayed(self.process_file)(filename) for filename in used_filenames)
@@ -327,7 +311,6 @@ class CorpusNotAbsolute(CorpusNotComplete):
 
 
 class Corpus(pd.DataFrame):
-
     _metadata = ['metadata']
 
     def __init__(self, source=None, *, subdir=None, file=None, corpus=None,
@@ -386,33 +369,32 @@ class Corpus(pd.DataFrame):
             else:
                 corpus = source
 
-
         # initialize or update metadata
         if metadata is None:
             metadata = Metadata(
-                ordered=False,
-                words=None,
-                corpus=subdir if subdir else file,
-                complete=True,
-                frequencies=False)
+                    ordered=False,
+                    words=None,
+                    corpus=subdir if subdir else file,
+                    complete=True,
+                    frequencies=False)
         else:
             metadata = Metadata(metadata)  # copy it, just in case
 
         # initialize data
         if subdir is not None:
-            if feature_generator is None:       # generate default feature generator from matching args
+            if feature_generator is None:  # generate default feature generator from matching args
                 fg_sig_arguments = signature(SimpleFeatureGenerator).parameters
                 fg_actual_args = {}
                 for key, value in kwargs.copy().items():
                     if key in fg_sig_arguments:
                         fg_actual_args[key] = value
-                        del kwargs[key]        # if they belong in metadata, FeatureGenerator will put them there
+                        del kwargs[key]  # if they belong in metadata, FeatureGenerator will put them there
                 feature_generator = SimpleFeatureGenerator(**fg_actual_args)
 
             logger.info(
-                "Creating corpus by reading %s using %s",
-                subdir,
-                feature_generator)
+                    "Creating corpus by reading %s using %s",
+                    subdir,
+                    feature_generator)
             df = feature_generator(subdir)
             metadata.update(feature_generator)
         elif file is not None:
@@ -422,10 +404,10 @@ class Corpus(pd.DataFrame):
                 metadata = Metadata.load(file)
             except OSError:
                 logger.warning(
-                    "Failed to load metadata for %s. Using defaults: %s",
-                    file,
-                    metadata,
-                    exc_info=False)
+                        "Failed to load metadata for %s. Using defaults: %s",
+                        file,
+                        metadata,
+                        exc_info=False)
             # TODO can we probably use hdf5?
         elif corpus is not None:
             df = corpus
@@ -448,7 +430,6 @@ class Corpus(pd.DataFrame):
         self.document_describer = document_describer
         self.feature_generator = feature_generator
 
-
     def new_data(self, data, **metadata):
         """
         Wraps the given `DataFrame` with metadata from this corpus object.
@@ -461,8 +442,6 @@ class Corpus(pd.DataFrame):
                       feature_generator=self.feature_generator,
                       document_describer=self.document_describer,
                       metadata=Metadata(self.metadata, **metadata))
-
-
 
     def save(self, filename="corpus_words.csv"):
         """
@@ -481,10 +460,10 @@ class Corpus(pd.DataFrame):
         """
         self.logger.info("Saving corpus to %s ...", filename)
         self.T.to_csv(
-            filename,
-            encoding="utf-8",
-            na_rep=0,
-            quoting=csv.QUOTE_NONNUMERIC)
+                filename,
+                encoding="utf-8",
+                na_rep=0,
+                quoting=csv.QUOTE_NONNUMERIC)
         self.metadata.save(filename)
         # TODO different formats? compression?
 
@@ -493,7 +472,7 @@ class Corpus(pd.DataFrame):
         Returns:
             bool: ``True`` if this is a corpus using absolute frequencies
         """
-        return not(self.metadata.frequencies)
+        return not (self.metadata.frequencies)
 
     def is_complete(self) -> bool:
         """
@@ -525,7 +504,6 @@ class Corpus(pd.DataFrame):
         else:
             return self.relative_frequencies()
 
-
     def top_n(self, mfwords):
         """
         Returns a new `Corpus` that contains the top n features.
@@ -537,11 +515,11 @@ class Corpus(pd.DataFrame):
             Corpus: a new corpus shortened to `mfwords`
         """
         return Corpus(
-            corpus=self.iloc[:, :mfwords],
-            document_describer=self.document_describer,
-            metadata=self.metadata,
-            complete=False,
-            words=mfwords)
+                corpus=self.iloc[:, :mfwords],
+                document_describer=self.document_describer,
+                metadata=self.metadata,
+                complete=False,
+                words=mfwords)
 
     def save_wordlist(self, filename, **kwargs):
         """
@@ -609,29 +587,28 @@ class Corpus(pd.DataFrame):
                              complete=False,
                              **metadata)
 
-
     def relative_frequencies(self):
         if self.metadata.frequencies:
             return self
-        elif not(self.is_complete()):
+        elif not (self.is_complete()):
             raise CorpusNotComplete()
         else:
             new_corpus = self.div(self.sum(axis=1), axis=0)
             return Corpus(
-                corpus=new_corpus,
-                document_describer=self.document_describer,
-                metadata = self.metadata,
-                complete=False,
-                frequencies=True)
+                    corpus=new_corpus,
+                    document_describer=self.document_describer,
+                    metadata=self.metadata,
+                    complete=False,
+                    frequencies=True)
 
     def z_scores(self):
         df = (self - self.mean()) / self.std()
         return Corpus(corpus=df,
-                        document_describer=self.document_describer,
-                        metadata=self.metadata,
-                        z_scores=True,
-                        complete=False,
-                        frequencies=True)
+                      document_describer=self.document_describer,
+                      metadata=self.metadata,
+                      z_scores=True,
+                      complete=False,
+                      frequencies=True)
 
     def cull(self, ratio=None, threshold=None, keepna=False):
         """
@@ -689,7 +666,7 @@ class Corpus(pd.DataFrame):
         Raises:
             CorpusNotAbsolute: if called on a corpus with relative frequencies
         """
-        if not(self.is_absolute()):
+        if not (self.is_absolute()):
             raise CorpusNotAbsolute('Replacing or adding documents')
         if subdir is None:
             if self.metadata.corpus is not None \
