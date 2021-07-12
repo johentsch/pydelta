@@ -285,7 +285,7 @@ class TableDocumentDescriber(DocumentDescriber):
         return self.table.at[document_name, self.group_col]
 
     def item_name(self, document_name):
-        return self.table.at[document_name, self.item_name]
+        return self.table.at[document_name, self.name_col]
 
 
 def ngrams(iterable, n=2, sep=None):
