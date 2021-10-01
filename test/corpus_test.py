@@ -74,3 +74,8 @@ def test_table_describer(testdir):
 def test_featuredescriber_args(testdir):
     corpus = d.Corpus(testdir, lower_case=True)
     assert 'Sie' not in corpus.columns
+
+
+def test_parallel_corpus(testdir, corpus):
+    parallel_corpus = d.Corpus(testdir, parallel=True)
+    assert (parallel_corpus == corpus).all().all()

@@ -226,7 +226,7 @@ class FeatureGenerator:
             data = parallel(delayed(self.process_file)(filename) for filename in used_filenames)
         else:
             data = (self.process_file(filename) for filename in used_filenames)
-        return {series.name: series for series in data}
+        return {self.get_name(fn): series for (series, fn) in zip(data, used_filenames)}
 
     def _get_parallel_executor(self) -> Parallel:
         if self.parallel:
