@@ -1,3 +1,5 @@
+import numpy as np
+import pandas as pd
 from pytest import approx
 
 import delta as d
@@ -79,3 +81,12 @@ def test_featuredescriber_args(testdir):
 def test_parallel_corpus(testdir, corpus):
     parallel_corpus = d.Corpus(testdir, parallel=True)
     assert (parallel_corpus == corpus).all().all()
+
+
+@pytest.mark.parametrize("attr_name", ["logger", "metadata", "feature_generator", "document_describer", "save"])
+def test_attribute_names(attr_name):
+    df = pd.DataFrame([[17, 4], [23, 42]],
+                      columns=['foo', attr_name],
+                      index=['doc1', 'doc2'])
+    corpus = d.Corpus(df)
+    assert list(corpus[attr_name]) == [4, 42]

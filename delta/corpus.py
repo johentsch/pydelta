@@ -311,7 +311,7 @@ class CorpusNotAbsolute(CorpusNotComplete):
 
 
 class Corpus(pd.DataFrame):
-    _metadata = ['metadata']
+    _metadata = ['metadata', 'logger', 'document_describer', 'feature_generator']
 
     def __init__(self, source=None, *, subdir=None, file=None, corpus=None,
                  feature_generator=None,
