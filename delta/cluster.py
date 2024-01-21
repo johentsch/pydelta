@@ -96,8 +96,8 @@ class FlatClustering:
             self.documents = distances.index
         else:
             raise ValueError(
-                "Flat clustering must be initialized from a distance matrix or a corpus.\n"
-                "(did you want to call Clustering.fcluster() instead?)")
+                f"Flat clustering must be initialized from a distance matrix or a corpus. Got: {type(distances)}\n"
+                f"(did you want to call Clustering.fcluster() instead?)")
         self.distances = distances
         self.metadata = Metadata(metadata if metadata is not None else
                                  distances.metadata, **kwargs)
@@ -140,8 +140,9 @@ class FlatClustering:
            authors in this cluster - 1
         4. sum of each cluster's errors = result
         """
+        #return (self.data.groupby("Cluster").Group.nunique()-1).sum()
         return int((self.data.groupby("Cluster")
-                    .agg(self.ngroups).Group-1).sum())
+                    .apply(self.ngroups)-1).sum())
 
     def purity(self):
         """
@@ -151,10 +152,10 @@ class FlatClustering:
         dividing by $N$
         """
         def correctly_classified(cluster):
-            return cluster.Group.value_counts()[0]
+            return cluster.Group.value_counts().iloc[0]
         return int(self.data.groupby("Cluster")
-                   .agg(correctly_classified)
-                   .Group.sum()) / self.data.index.size
+                   .apply(correctly_classified)
+                   .sum()) / self.data.index.size
 
     def entropy(self):
         """
