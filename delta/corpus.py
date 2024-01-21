@@ -688,10 +688,10 @@ class Corpus(pd.DataFrame):
 
     def types(self) -> pd.Series:
         """Number of different features by text"""
-        if self.is_absolute():
+        if self.is_complete():
             return self.replace(0, float('NaN')).count(axis=1)
         else:
-            raise CorpusNotAbsolute('Calculation on absolute numbers')
+            raise CorpusNotComplete
 
     def ttr(self) -> float:
         """
