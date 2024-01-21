@@ -372,6 +372,7 @@ class Corpus(pd.DataFrame):
         # initialize or update metadata
         if metadata is None:
             metadata = Metadata(
+                    features='chords',
                     ordered=False,
                     words=None,
                     corpus=subdir if subdir else file,

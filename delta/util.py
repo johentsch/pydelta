@@ -287,6 +287,91 @@ class TableDocumentDescriber(DocumentDescriber):
     def item_name(self, document_name):
         return self.table.at[document_name, self.name_col]
 
+class TsvDocumentDescriber(TableDocumentDescriber):
+    """
+    A document describer that takes groups and item labels from an "metadata.tsv" file.
+    """
+
+    def __init__(self, table, group_col="corpus", name_col="piece", **kwargs):
+        """
+        Args:
+            table (str or pandas.DataFrame):
+                A table with metadata that describes the documents of the
+                corpus, either a :class:`pandas.DataFrame` or path or IO to a
+                CSV file. The tables index (or first column for CSV files)
+                contains the document ids that are returned by the
+                :class:`FeatureGenerator`. The columns (or first row) contains
+                column labels.
+            group_col (str):
+                Name of the column in the table that contains the names of the
+                groups. Will be used, e.g., for determining the ground truth
+                for cluster evaluation, and for coloring the dendrograms.
+            name_col (str):
+                Name of the column in the table that contains the names of the
+                individual items.
+            dialect (str or :class:`csv.Dialect`):
+                CSV dialect to use for reading the file.
+            **kwargs:
+                Passed on to :func:`pandas.read_table`.
+        Raises:
+            ValueError: when arguments inconsistent
+        See:
+            pandas.read_table
+        """
+        if isinstance(table, pd.DataFrame):
+            self.table = table
+        else:
+            self.table = pd.read_csv(table, sep="\t", **kwargs)
+        self.group_col = group_col
+        self.name_col = name_col
+
+        if not(group_col in self.table.columns):
+            raise ValueError('Given group column {} is not in the table: {}'.format(group_col, self.table.columns))
+        if not(name_col in self.table.columns):
+            raise ValueError('Given name column {} is not in the table: {}'.format(name_col, self.table.columns))
+
+    def group_name(self, document_name):
+        try:
+            return self.table.at[document_name, self.group_col]
+        except KeyError:
+            return document_name.split(", ")[0]
+
+    def item_name(self, document_name):
+        try:
+            return self.table.at[document_name, self.name_col]
+        except KeyError:
+            return ", ".join(document_name.split(", ")[1:])
+
+    def group_label(self, document_name):
+        """
+        Returns a (maybe shortened) label for the group, for display purposes.
+
+        The default implementation just returns the :meth:`group_name`.
+        """
+        return self.group_name(document_name)
+
+    def item_label(self, document_name):
+        """
+        Returns a (maybe shortened) label for the item within the group, for
+        display purposes.
+
+        The default implementation just returns the :meth:`item_name`.
+        """
+        return self.item_name(document_name)
+
+    def label(self, document_name):
+        """
+        Returns a label for the document (including its group).
+        """
+        return self.group_label(document_name) + ", " + self.item_label(document_name)
+
+    def groups(self, documents=None):
+        """
+        Returns the names of all groups of the given list of documents.
+        """
+        if documents is None:
+            return set(self.table[self.group_col])
+        return {self.group_name(document) for document in documents}
 
 def ngrams(iterable, n=2, sep=None):
     """
