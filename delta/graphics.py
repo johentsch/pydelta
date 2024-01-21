@@ -85,7 +85,7 @@ class Dendrogram:
             plt.title(title.format_map(self.metadata))
         if xlabel is not None:
             plt.xlabel(xlabel.format_map(self.metadata))
-        plt.tight_layout(2)
+        plt.tight_layout(pad=2)
 
     def link_color_func(self, k):
         print(k)
