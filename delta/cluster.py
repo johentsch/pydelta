@@ -11,6 +11,8 @@ KMedoidsClustering.
 """
 
 import logging
+from functools import cache
+
 logger = logging.getLogger(__name__)
 
 from pprint import pformat
@@ -49,6 +51,13 @@ class Clustering:
             return sch.linkage(ssd.squareform(self.distance_matrix),
                                method=self.method, metric="euclidean")
 
+    def describe(self):
+        return self.fclustering().describe()
+
+    def evaluate(self):
+        return self.fclustering().evaluate()
+
+    @cache
     def fclustering(self):
         """
         Returns a default flat clustering from the hierarchical version.
@@ -65,6 +74,7 @@ class Clustering:
         flat.set_clusters(sch.fcluster(self.linkage, flat.group_count,
                                        criterion="maxclust"))
         return flat
+
 
 
 class FlatClustering:
