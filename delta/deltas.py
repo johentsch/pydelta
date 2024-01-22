@@ -335,32 +335,37 @@ class DeltaFunction:
         """Registers this delta function with the global function registry."""
         registry.add_delta(self)
 
-    def iterate_distance(self, corpus, *args, **kwargs):
-        """
-        Calculates the distance matrix for the given corpus.
+    # def iterate_distance(self, corpus, *args, **kwargs):
+    #     """
+    #     Calculates the distance matrix for the given corpus.
+    #
+    #     The default implementation will iterate over all pairwise combinations
+    #     of the documents in the given corpus and call :meth:`distance` on each
+    #     pair, passing on the additional arguments.
+    #
+    #     Clients may want to use :meth:`__call__` instead, i.e. they want to call
+    #     this object as a function.
+    #
+    #     Args:
+    #         corpus (Corpus): feature matrix for which to calculate the distance
+    #         *args, **kwargs: further arguments for the matrix
+    #     Returns:
+    #         pandas.DataFrame: square dataframe containing pairwise distances.
+    #             The default implementation will return a matrix that has zeros
+    #             on the diagonal and the lower triangle a mirror of the upper
+    #             triangle.
+    #     """
+    #     df = pd.DataFrame(index=corpus.index, columns=corpus.index)
+    #     for a, b in combinations(df.index, 2):
+    #         delta = self.distance(corpus.loc[a,:], corpus.loc[b,:], *args, **kwargs)
+    #         df.at[a, b] = delta
+    #         df.at[b, a] = delta
+    #     return df.fillna(0)
 
-        The default implementation will iterate over all pairwise combinations
-        of the documents in the given corpus and call :meth:`distance` on each
-        pair, passing on the additional arguments.
-
-        Clients may want to use :meth:`__call__` instead, i.e. they want to call
-        this object as a function.
-
-        Args:
-            corpus (Corpus): feature matrix for which to calculate the distance
-            *args, **kwargs: further arguments for the matrix
-        Returns:
-            pandas.DataFrame: square dataframe containing pairwise distances.
-                The default implementation will return a matrix that has zeros
-                on the diagonal and the lower triangle a mirror of the upper
-                triangle.
-        """
-        df = pd.DataFrame(index=corpus.index, columns=corpus.index)
-        for a, b in combinations(df.index, 2):
-            delta = self.distance(corpus.loc[a,:], corpus.loc[b,:], *args, **kwargs)
-            df.at[a, b] = delta
-            df.at[b, a] = delta
-        return df.fillna(0)
+    def pairwise_distance(self, corpus, **kwargs):
+        distances_long = ssd.pdist(corpus, self.distance, **kwargs)
+        distances_square = ssd.squareform(distances_long)
+        return pd.DataFrame(distances_square, index=corpus.index, columns=corpus.index)
 
     def create_result(self, df, corpus):
         """
@@ -387,7 +392,7 @@ class DeltaFunction:
         Returns:
             DistanceMatrix: Pairwise distances between the documents
         """
-        return self.create_result(self.iterate_distance(corpus), corpus)
+        return self.create_result(self.pairwise_distance(corpus), corpus)
 
 
     def prepare(self, corpus):
@@ -427,16 +432,16 @@ class _LinearDelta(DeltaFunction):
 
         :param values: a pd.Series of values
         """
-        return (values - values.median()).abs().sum() / values.size
+        return np.abs(values - values.median()).sum() / values.size
 
     @staticmethod
     def distance(u, v, *args, diversities=None):
-        dist = ((u - v).abs() / diversities).sum()
+        dist = (np.abs(u - v) / diversities).sum()
         return dist
 
     def __call__(self, corpus):
         diversities = corpus.apply(_LinearDelta.diversity)
-        matrix = self.iterate_distance(corpus, diversities=diversities)
+        matrix = self.pairwise_distance(corpus, diversities=diversities)
         return self.create_result(matrix, corpus)
 
 
@@ -455,7 +460,7 @@ class PreprocessingDeltaFunction(DeltaFunction):
     def __call__(self, corpus):
         kwargs = self.prep_function(corpus)
         logger.info("Preprocessor delivered %s", kwargs)
-        matrix = self.iterate_distance(corpus, **kwargs)
+        matrix = self.pairwise_distance(corpus, **kwargs)
         return self.create_result(matrix, corpus)
 
 _LinearDelta(descriptor="linear", name="Linear Delta")
@@ -470,7 +475,7 @@ def _classic_delta(a, b, stds, n
     """
     Burrow's Classic Delta, from pydelta 0.1
     """
-    return ((a - b).abs() / stds).sum() / n
+    return (np.abs(a - b) / stds).sum() / n
 def _prep_classic_delta(corpus):
     return { 'stds': corpus.std(), 'n': corpus.columns.size }
 PreprocessingDeltaFunction(_classic_delta, _prep_classic_delta, 'burrows2')
@@ -860,12 +865,12 @@ def diversity_scaled(corpus):
     Returns a copy of this corpus which has been scaled by the diversity argument from the Laplace distribution.
     """
     def diversity(values):
-        return (values - values.median()).abs().sum() / values.size
+        return np.abs(values - values.median()).sum() / values.size
     return corpus / corpus.apply(diversity)
 
 @normalization
 def sqrt(corpus):
-    return corpus.sqrt()
+    return corpus.apply(np.sqrt)
 
 @normalization
 def clamp(corpus, lower_bound=-1, upper_bound=1):
