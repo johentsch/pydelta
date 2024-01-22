@@ -54,7 +54,7 @@ except ImportError:
     from scipy.special import comb
 from itertools import combinations
 from functools import update_wrapper
-from .util import Metadata, compare_pairwise
+from .util import Metadata, compare_pairwise, append_dataframe_to_zip
 from .corpus import Corpus
 from textwrap import dedent
 from sklearn.metrics import pairwise_distances
@@ -656,6 +656,11 @@ class DistanceMatrix(pd.DataFrame):
     def save(self, filename):
         self.to_csv(filename)
         self.metadata.save(filename)
+
+    def save_to_zip(self, filename, zip_path):
+        """Append the corpus to the ZIP file under the given path."""
+        append_dataframe_to_zip(self, filename, zip_path)
+        self.metadata.save_to_zip(filename, zip_path)
 
     def _remove_duplicates(self, transpose=False, check=True):
         """

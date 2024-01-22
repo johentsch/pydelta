@@ -5,6 +5,8 @@ Contains utility classes and functions.
 
 import json
 from collections.abc import Mapping
+from zipfile import ZipFile
+
 import pandas as pd
 import itertools
 import scipy.spatial.distance as ssd
@@ -101,6 +103,14 @@ class Metadata(Mapping):
         return filename + '.meta'
 
     @classmethod
+    def from_zip_file(cls, filename, zip_handler):
+        """Load the metadata from the ZIP file under the given path."""
+        metafilename = cls.metafilename(filename)
+        with zip_handler.open(metafilename, 'r') as metafile:
+            return cls(**json.load(metafile))
+
+
+    @classmethod
     def load(cls, filename):
         """
         Loads a metadata instance from the filename identified by the argument.
@@ -128,6 +138,13 @@ class Metadata(Mapping):
         metafilename = self.metafilename(filename)
         with open(metafilename, "wt", encoding="utf-8") as f:
             json.dump(self.__dict__, f, **kwargs)
+
+    def save_to_zip(self, filename, zip_path):
+        """Append the corpus metadata to the ZIP file under the given path."""
+        metafilename = self.metafilename(filename)
+        with ZipFile(zip_path, 'a') as myzip:
+            myzip.writestr(metafilename, json.dumps(self.__dict__, indent=2))
+
 
     def __repr__(self):
         return type(self).__name__ + '(' + \
@@ -486,3 +503,17 @@ def compare_pairwise(df, comparisons=None):
 
     index = pd.MultiIndex.from_tuples(itertools.combinations(df.index, 2))
     return pd.DataFrame(results, index=index)
+
+
+def append_dataframe_to_zip(df, filename, zip_path, **kwargs):
+    """Append the dataframe to the ZIP file under the given path."""
+    df.to_csv(
+        zip_path,
+        sep='\t',
+        mode='a',
+        compression=dict(
+            method='zip',
+            archive_name=filename
+        ),
+        **kwargs
+    )

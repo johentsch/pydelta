@@ -25,7 +25,7 @@ from warnings import warn
 from delta.corpus import Corpus, FeatureGenerator, LETTERS_PATTERN, WORD_PATTERN
 from delta.deltas import registry as functions, normalization, Normalization, \
         DeltaFunction, PDistDeltaFunction, MetricDeltaFunction, \
-        CompositeDeltaFunction
+        CompositeDeltaFunction, DistanceMatrix
 from delta.cluster import Clustering, FlatClustering
 
 from delta.features import get_rfe_features

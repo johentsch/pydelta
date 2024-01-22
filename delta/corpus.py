@@ -20,7 +20,7 @@ import pandas as pd
 import collections
 import csv
 from math import ceil
-from delta.util import Metadata, DocumentDescriber, DefaultDocumentDescriber, ngrams
+from delta.util import Metadata, DefaultDocumentDescriber, ngrams, append_dataframe_to_zip
 
 from joblib import Parallel, delayed
 
@@ -313,6 +313,7 @@ class CorpusNotAbsolute(CorpusNotComplete):
 class Corpus(pd.DataFrame):
     _metadata = ['metadata', 'logger', 'document_describer', 'feature_generator']
 
+
     def __init__(self, source=None, *, subdir=None, file=None, corpus=None,
                  feature_generator=None,
                  document_describer=DefaultDocumentDescriber(),
@@ -467,6 +468,14 @@ class Corpus(pd.DataFrame):
                 quoting=csv.QUOTE_NONNUMERIC)
         self.metadata.save(filename)
         # TODO different formats? compression?
+
+    def save_to_zip(self, filename, zip_path):
+        """Append the corpus to the ZIP file under the given path."""
+        self.logger.info("Appending corpus to %s ...", zip_path)
+        append_dataframe_to_zip(self, filename, zip_path)
+        self.metadata.save_to_zip(filename, zip_path)
+
+
 
     def is_absolute(self) -> bool:
         """
