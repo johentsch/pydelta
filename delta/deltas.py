@@ -40,8 +40,11 @@ Simple Delta Functions
 Simple delta functions are functions that
 
 """
-
+from __future__ import annotations
 import logging
+from enum import Enum
+from typing import Tuple
+
 logger = logging.getLogger(__name__)
 
 import numpy as np
@@ -52,9 +55,8 @@ try:
     from scipy.misc import comb
 except ImportError:
     from scipy.special import comb
-from itertools import combinations
-from functools import update_wrapper
-from .util import Metadata, compare_pairwise, append_dataframe_to_zip
+from functools import update_wrapper, cached_property
+from .util import Metadata, compare_pairwise, append_dataframe_to_zip, get_triangle_values, map_to_index_levels
 from .corpus import Corpus
 from textwrap import dedent
 from sklearn.metrics import pairwise_distances
@@ -602,7 +604,15 @@ class MetricDeltaFunction(DeltaFunction):
         np.fill_diagonal(df.values, 0)   # rounding errors may lead to validation bugs
         return self.create_result(df, corpus)
 
-
+class DeltaColumns(Enum):
+    """
+    Columns in the delta table.
+    """
+    DELTA = 'Delta'
+    AUTHOR1 = 'Composer1'
+    AUTHOR2 = 'Composer2'
+    TEXT1 = 'Document1'
+    TEXT2 = 'Document2'
 
 class DistanceMatrix(pd.DataFrame):
 
@@ -643,6 +653,28 @@ class DistanceMatrix(pd.DataFrame):
         else:
             self.document_describer = None
 
+    @cached_property
+    def long_format(self) -> pd.Series:
+        """Like calling :meth:`delta_values`."""
+        return self.delta_values()
+
+    @cached_property
+    def long_format_group_index_levels(self) -> Tuple[pd.Series, pd.Series]:
+        """Returns each of the two index levels of :meth:`delta_values` as a series with the same index but where the
+        values of a given level have been replaced with their group (i.e. corpus) name.
+        """
+        deltas = self.long_format
+        group_a, group_b = map_to_index_levels(deltas.index, self.document_describer.group_name)
+        return group_a, group_b
+
+    @cached_property
+    def long_format_item_index_levels(self) -> Tuple[pd.Series, pd.Series]:
+        """Returns each of the two index levels of :meth:`delta_values` as a series with the same index but where the
+        values of a given level have been replaced with their group (i.e. corpus) name.
+        """
+        deltas = self.long_format
+        item_a, item_b = map_to_index_levels(deltas.index, self.document_describer.item_name)
+        return item_a, item_b
 
     @classmethod
     def from_csv(cls, filename):
@@ -673,7 +705,7 @@ class DistanceMatrix(pd.DataFrame):
             return self._remove_duplicates(transpose=not transpose, check=False)
         return result
 
-    def delta_values(self, transpose=False, check=True):
+    def _delta_values(self, transpose=False, check=True):
         r"""
         Converts the given n×n Delta matrix to a :math:`\binom{n}{2}` long
         series of distinct delta values – i.e. duplicates from the upper
@@ -688,6 +720,14 @@ class DistanceMatrix(pd.DataFrame):
         result.name = self.metadata.get('delta')
         return result
 
+    def delta_values(self, transpose=False, check=None, without_diagonal=True) -> pd.Series:
+        df = self.T if transpose else self
+        return get_triangle_values(df, offset=int(without_diagonal), name=self.metadata.get('delta'))
+
+
+
+
+
     def delta_values_df(self):
         """
         Returns an stacked form of the given delta table along with
@@ -696,15 +736,17 @@ class DistanceMatrix(pd.DataFrame):
         The dataframe returned has the columns Author1, Author2, Text1, Text2,
         and Delta, it has an entry for every unique combination of texts
         """
-        values = self.delta_values().to_frame()
-        values.columns = pd.Index(['Delta'])
-        values['Author1'] = values.index.to_series().map(lambda t:
-                                                         t[0].split('_')[0])
-        values['Author2'] = values.index.to_series().map(lambda t:
-                                                         t[1].split('_')[0])
-        values['Text1'] = values.index.to_series().map(lambda t: t[0])
-        values['Text2'] = values.index.to_series().map(lambda t: t[1])
-        return values
+        deltas = self.long_format
+        group_a, group_b = self.long_format_group_index_levels
+        item_a, item_b = self.long_format_item_index_levels
+        result = pd.concat([
+            deltas,
+            group_a.rename(DeltaColumns.AUTHOR1.value),
+            group_b.rename(DeltaColumns.AUTHOR2.value),
+            item_a.rename(DeltaColumns.TEXT1.value),
+            item_b.rename(DeltaColumns.TEXT2.value)
+        ], axis=1)
+        return result.rename(columns={result.columns[0]: DeltaColumns.DELTA.value})
 
     def f_ratio(self):
         """
@@ -716,17 +758,22 @@ class DistanceMatrix(pd.DataFrame):
         """
         values = self.delta_values_df()
 
-        def ratio(group):
-            same = group.Author1 == group.Author2
-            size = same.value_counts()
-            if size.index.size < 2:
+        delta_col = DeltaColumns.DELTA.value
+
+        def ratio(group: pd.DataFrame):
+            in_group = group[DeltaColumns.AUTHOR1.value] == group[DeltaColumns.AUTHOR2.value]
+            out_group = ~in_group
+            n_in, n_out = in_group.sum(), out_group.sum()
+            if not (n_in and n_out):
                 return np.nan
-            within = (group[same].Delta**2).sum() / size[True]
-            without = (group[same == False].Delta**2).sum() / size[False]
+            deltas = group[delta_col]
+            within = deltas[in_group].mean()
+            without = deltas[out_group].mean()
             return within / without
 
-        ratios = values.groupby('Author1').apply(ratio)
-        return ratios.sum() / ratios.index.size
+        values.loc[:, delta_col] = values[delta_col] ** 2
+        ratios = values.groupby(DeltaColumns.AUTHOR1.value).apply(ratio)
+        return ratios.mean()
 
     def fisher_ld(self):
         """
@@ -738,24 +785,27 @@ class DistanceMatrix(pd.DataFrame):
 
         def ratio(group):
             # group = all differences with the same Text1
-            ingroup = group[group.Author1 == group.Author2].Delta
-            outgroup = group[group.Author1 != group.Author2].Delta
+            in_group = group[DeltaColumns.AUTHOR1.value] == group[DeltaColumns.AUTHOR2.value]
+            deltas = group[DeltaColumns.DELTA.value]
+            ingroup = deltas[in_group]
+            outgroup = deltas[~in_group]
             return ((ingroup.mean() - outgroup.mean())**2) / (ingroup.var() + outgroup.var())
 
-        ratios = values.groupby('Text1').apply(ratio)
-        return ratios.sum() / comb(len(values.Author1.unique()), 2)
+        ratios = values.groupby(DeltaColumns.TEXT1.value).apply(ratio)
+        n_authors = values[DeltaColumns.AUTHOR1.value].nunique()
+        return ratios.sum() / comb(n_authors, 2)
 
     def z_scores(self):
         """
         Returns a distance matrix with the distances standardized using z-scores
         """
-        deltas = self.delta_values()
+        deltas = self.long_format
         return DistanceMatrix((self - deltas.mean()) / deltas.std(),
                               metadata=self.metadata,
                               document_describer=self.document_describer,
                               distance_normalization='z-score')
 
-    def partition(self):
+    def partition(self, square=False):
         """
         Splits this distance matrix into two sparse halves: the first contains
         only the differences between documents that are in the same group
@@ -768,18 +818,13 @@ class DistanceMatrix(pd.DataFrame):
         Returns:
             (DistanceMatrix, DistanceMatrix): (in_group, out_group)
         """
-        same = DistanceMatrix(pd.DataFrame(index=self.index,
-                                           columns=self.index),
-                              copy_from=self, subset='in-group')
-        diff = DistanceMatrix(pd.DataFrame(index=self.index,
-                                           columns=self.index),
-                              copy_from=self, subset='out-group')
-        group = self.document_describer.group_name
-        for d1, d2 in combinations(self.columns, 2):
-            if group(d1) == group(d2):
-                same.at[d1, d2] = self.at[d1, d2]
-            else:
-                diff.at[d1, d2] = self.at[d1, d2]
+        if square:
+            raise NotImplementedError("partition available only in (non-redundant) long format")
+        deltas = self.long_format
+        group_a, group_b = self.long_format_group_index_levels
+        in_group = group_a == group_b
+        same = deltas[in_group]
+        diff = deltas[~in_group]
         return (same, diff)
 
     def simple_score(self):
@@ -791,9 +836,7 @@ class DistanceMatrix(pd.DataFrame):
         different authors are considered *score* standard deviations more
         different than equal authors.
         """
-        in_group_df, out_group_df = self.z_scores().partition()
-        in_group, out_group = (in_group_df.delta_values(check=False),
-                               out_group_df.delta_values(check=False))
+        in_group, out_group = self.z_scores().partition(square=False)
         score = out_group.mean() - in_group.mean()
         return score
 
@@ -822,7 +865,10 @@ class DistanceMatrix(pd.DataFrame):
             a dataframe with a row for each pairwise document combination (as in `DistanceMatrix.delta_values`).
             The first column will contain the delta values, subsequent columns the metadata comparisons.
         """
-        return pd.concat([self.delta_values(), compare_pairwise(doc_metadata, comparisons)], join=join, axis=1)
+        return pd.concat([self.long_format, compare_pairwise(doc_metadata, comparisons)], join=join, axis=1)
+
+    def __hash__(self):
+        return hash(tuple(pd.util.hash_pandas_object(self)))
 
 
 

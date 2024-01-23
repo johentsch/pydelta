@@ -5,6 +5,8 @@ Contains utility classes and functions.
 
 import json
 from collections.abc import Mapping
+from functools import cache
+from typing import Optional, Iterable, Union, Tuple, Set
 from zipfile import ZipFile
 
 import pandas as pd
@@ -347,18 +349,21 @@ class TsvDocumentDescriber(TableDocumentDescriber):
         if not(name_col in self.table.columns):
             raise ValueError('Given name column {} is not in the table: {}'.format(name_col, self.table.columns))
 
+    @cache
     def group_name(self, document_name):
         try:
             return self.table.at[document_name, self.group_col]
         except KeyError:
             return document_name.split(", ")[0]
 
+    @cache
     def item_name(self, document_name):
         try:
             return self.table.at[document_name, self.name_col]
         except KeyError:
             return ", ".join(document_name.split(", ")[1:])
 
+    @cache
     def group_label(self, document_name):
         """
         Returns a (maybe shortened) label for the group, for display purposes.
@@ -367,6 +372,7 @@ class TsvDocumentDescriber(TableDocumentDescriber):
         """
         return self.group_name(document_name)
 
+    @cache
     def item_label(self, document_name):
         """
         Returns a (maybe shortened) label for the item within the group, for
@@ -376,13 +382,14 @@ class TsvDocumentDescriber(TableDocumentDescriber):
         """
         return self.item_name(document_name)
 
+    @cache
     def label(self, document_name):
         """
         Returns a label for the document (including its group).
         """
         return self.group_label(document_name) + ", " + self.item_label(document_name)
 
-    def groups(self, documents=None):
+    def groups(self, documents: Optional[Iterable[str]] = None) -> Set[str]:
         """
         Returns the names of all groups of the given list of documents.
         """
@@ -504,6 +511,44 @@ def compare_pairwise(df, comparisons=None):
     index = pd.MultiIndex.from_tuples(itertools.combinations(df.index, 2))
     return pd.DataFrame(results, index=index)
 
+def map_to_index_levels(multiindex, func) -> Tuple[pd.Series, ...]:
+    index_levels = multiindex.to_frame().map(func)
+    alphabet_names = [chr(n) for n in range(ord("a"), ord("a")+len(index_levels.columns))]
+    index_levels.columns = alphabet_names
+    return tuple(series for _, series in index_levels.items())
+
+def merge_index_levels(index) -> pd.Index:
+    if index.nlevels == 1:
+        return index
+    return index.to_flat_index()
+
+
+
+def get_triangle_values(
+        data: Union[pd.DataFrame, np.array],
+        offset: int = 0,
+        lower=False,
+        name: Optional[str] = None
+):
+    is_dataframe = isinstance(data, pd.DataFrame)
+    if is_dataframe:
+        matrix = data.values
+    else:
+        matrix = data
+    if lower:
+        i, j = np.tril_indices_from(matrix, offset)
+    else:
+        i, j = np.triu_indices_from(matrix, offset)
+    values = matrix[i, j]
+    if not is_dataframe:
+        return values
+    try:
+        level_0 = merge_index_levels(data.index[i])
+        level_1 = merge_index_levels(data.columns[j])
+        index = pd.MultiIndex.from_arrays([level_0, level_1])
+    except Exception:
+        print(data.index[i], data.columns[j])
+    return pd.Series(values, index=index, name=name)
 
 def append_dataframe_to_zip(df, filename, zip_path, **kwargs):
     """Append the dataframe to the ZIP file under the given path."""
