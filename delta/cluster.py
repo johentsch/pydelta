@@ -9,7 +9,7 @@ by :class:`FlatClustering`.
 If supported by the installed version of scikit-learn, there is also a
 KMedoidsClustering.
 """
-
+from __future__ import annotations
 import logging
 from functools import cache
 
@@ -58,7 +58,7 @@ class Clustering:
         return self.fclustering().evaluate()
 
     @cache
-    def fclustering(self):
+    def fclustering(self) -> FlatClustering:
         """
         Returns a default flat clustering from the hierarchical version.
 
@@ -140,7 +140,7 @@ class FlatClustering:
         """
         return len(set(df.Group))
 
-    def cluster_errors(self):
+    def _cluster_errors(self):
         """
         Calculates the number of cluster errors by:
 
@@ -154,6 +154,9 @@ class FlatClustering:
         return int((self.data.groupby("Cluster")
                     .apply(self.ngroups)-1).sum())
 
+    def cluster_errors(self):
+        return self.data.GroupID.ne(self.data.Cluster).sum()
+
     def purity(self):
         """
         To compute purity, each cluster is assigned to the class which is most
@@ -165,7 +168,7 @@ class FlatClustering:
             return cluster.Group.value_counts().iloc[0]
         return int(self.data.groupby("Cluster")
                    .apply(correctly_classified)
-                   .sum()) / self.data.index.size
+                   .sum()) / len(self.data)
 
     def entropy(self):
         """
