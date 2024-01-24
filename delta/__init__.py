@@ -41,7 +41,7 @@ __all__ = [ "Corpus", "FeatureGenerator", "LETTERS_PATTERN", "WORD_PATTERN",
            "compare_pairwise", "Metadata", "TsvDocumentDescriber"]
 
 try:
-        from delta.cluster import KMedoidsClustering
+        from delta.cluster import KMedoidsClustering, KMedoidsClustering_distances
         __all__.append("KMedoidsClustering")
 except (ImportError, NameError):
         warn("KMedoidsClustering not available")

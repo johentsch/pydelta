@@ -77,6 +77,7 @@ class Clustering:
 
 
 
+
 class FlatClustering:
     """
     A flat clustering represents a non-hierarchical clustering.
@@ -155,7 +156,11 @@ class FlatClustering:
                     .apply(self.ngroups)-1).sum())
 
     def cluster_errors(self):
-        return self.data.GroupID.ne(self.data.Cluster).sum()
+        """Sums up for each cluster the number documents that do not belong to the most frequent group in that cluster.
+        """
+        return self.data.groupby("Cluster").apply(lambda df: df.Group.value_counts().iloc[1:].sum()).sum()
+        # wrong approach because the clusters IDs are arbitrary:
+        # return self.data.GroupID.ne(self.data.Cluster).sum()
 
     def purity(self):
         """
@@ -250,12 +255,12 @@ try:
 
     class KMedoidsClustering_distances(FlatClustering):
 
-        def __init__(self, distances, n_clusters=None, metadata=None,
+        def __init__(self, distances, n_clusters=None, metadata=None, init="heuristic",
                      **kwargs):
             super().__init__(distances, metadata, **kwargs)
             if n_clusters is None:
                 n_clusters = self.group_count
-            model = KMedoids(n_clusters=n_clusters, metric='precomputed', method='pam')
+            model = KMedoids(n_clusters=n_clusters, metric='precomputed', method='pam', init=init)
             self.set_clusters(model.fit_predict(distances))
 
     class KMedoidsClustering(FlatClustering):
