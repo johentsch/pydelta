@@ -21,7 +21,7 @@ import pandas as pd
 import scipy.spatial.distance as ssd
 import scipy.cluster.hierarchy as sch
 from delta.util import Metadata
-from delta.deltas import DistanceMatrix
+from delta.deltas import DistanceMatrix, f_ratio, fisher_ld, simple_score
 from delta.corpus import Corpus
 from sklearn import metrics
 
@@ -42,6 +42,7 @@ class Clustering:
         self.describer = distance_matrix.document_describer
         self.method = method
         self.linkage = self._calc_linkage()
+        self.data: pd.DataFrame
 
     def _calc_linkage(self):
         if self.method == "ward":
@@ -158,9 +159,7 @@ class FlatClustering:
     def cluster_errors(self):
         """Sums up for each cluster the number documents that do not belong to the most frequent group in that cluster.
         """
-        return self.data.groupby("Cluster").apply(lambda df: df.Group.value_counts().iloc[1:].sum()).sum()
-        # wrong approach because the clusters IDs are arbitrary:
-        # return self.data.GroupID.ne(self.data.Cluster).sum()
+        return cluster_errors(self)
 
     def purity(self):
         """
@@ -169,30 +168,13 @@ class FlatClustering:
         measured by counting the number of correctly assigned documents and
         dividing by $N$
         """
-        def correctly_classified(cluster):
-            return cluster.Group.value_counts().iloc[0]
-        return int(self.data.groupby("Cluster")
-                   .apply(correctly_classified)
-                   .sum()) / len(self.data)
+        return purity(self)
 
     def entropy(self):
         """
         Smaller entropy values suggest a better clustering.
         """
-        classes = self.data.Group.unique().size
-
-        def cluster_entropy(cluster):
-            class_counts = cluster.value_counts()
-            return float((class_counts / cluster.index.size *
-                          np.log(class_counts / cluster.index.size)).sum() *
-                         (-1)/np.log(classes))
-
-        def weighted_cluster_entropy(cluster):
-            return (cluster.index.size / self.data.index.size) * \
-                cluster_entropy(cluster)
-
-        return self.data.groupby("Cluster") \
-            .agg(weighted_cluster_entropy).Group.sum()
+        return entropy(self)
 
     def adjusted_rand_index(self):
         """
@@ -200,12 +182,10 @@ class FlatClustering:
         http://scikit-learn.org/stable/modules/generated/sklearn.metrics.adjusted_rand_score.html#sklearn.metrics.adjusted_rand_score
         """
         logger.debug("Calculating ARI for %s", self.data)
-        return metrics.adjusted_rand_score(self.data.GroupID,
-                                           self.data.Cluster)
+        return adjusted_rand_index(self)
 
     def homogeneity_completeness_v_measure(self):
-        return metrics.homogeneity_completeness_v_measure(self.data.GroupID,
-                                                          self.data.Cluster)
+        return homogeneity_completeness_v_measure(self)
 
     def evaluate(self):
         """
@@ -279,3 +259,108 @@ try:
 except ImportError:
     logger.log(logging.WARNING, "KMedoids clustering not available.\n" \
                "You need scikit-learn-extras", exc_info=1)
+
+
+def _adjusted_rand_index(clustering_data):
+    return metrics.adjusted_rand_score(
+        clustering_data.GroupID,
+        clustering_data.Cluster
+    )
+
+def adjusted_rand_index(clustering: Clustering):
+    """
+    Calculates the Adjusted Rand Index for the given flat clustering
+    http://scikit-learn.org/stable/modules/generated/sklearn.metrics.adjusted_rand_score.html#sklearn.metrics.adjusted_rand_score
+    """
+    clustering_data = clustering.data
+    return _adjusted_rand_index(clustering_data)
+
+
+def _cluster_errors(clustering_data):
+    return clustering_data.groupby("Cluster").apply(lambda df: df.Group.value_counts().iloc[1:].sum()).sum()
+    # wrong approach because the clusters IDs are arbitrary:
+    # return clustering.data.GroupID.ne(self.data.Cluster).sum()
+
+def cluster_errors(clustering: Clustering):
+    """Sums up for each cluster the number documents that do not belong to the most frequent group in that cluster.
+    """
+    clustering_data = clustering.data
+    return _cluster_errors(clustering_data)
+
+
+def _entropy(clustering_data):
+    classes = clustering_data.Group.unique().size
+
+    def cluster_entropy(cluster):
+        class_counts = cluster.value_counts()
+        return float(
+            (class_counts / cluster.index.size *
+             np.log(class_counts / cluster.index.size)).sum() *
+            (-1) / np.log(classes)
+            )
+
+    def weighted_cluster_entropy(cluster):
+        return (cluster.index.size / clustering_data.index.size) * \
+            cluster_entropy(cluster)
+
+    return clustering_data.groupby("Cluster") \
+        .agg(weighted_cluster_entropy).Group.sum()
+
+def entropy(clustering):
+    """
+    Smaller entropy values suggest a better clustering.
+    """
+    clustering_data = clustering.data
+    return _entropy(clustering_data)
+
+
+def _homogeneity_completeness_v_measure(clustering_data):
+    return metrics.homogeneity_completeness_v_measure(
+        clustering_data.GroupID,
+        clustering_data.Cluster
+    )
+
+def homogeneity_completeness_v_measure(clustering):
+    clustering_data = clustering.data
+    return _homogeneity_completeness_v_measure(clustering_data)
+
+
+def _purity(clustering_data):
+    def correctly_classified(cluster):
+        return cluster.Group.value_counts().iloc[0]
+
+    return int(
+        clustering_data.groupby("Cluster")
+        .apply(correctly_classified)
+        .sum()
+    ) / len(clustering_data)
+
+def purity(clustering: Clustering):
+    """
+    To compute purity, each cluster is assigned to the class which is most
+    frequent in the cluster, and then the accuracy of this assignment is
+    measured by counting the number of correctly assigned documents and
+    dividing by $N$
+    """
+    clustering_data = clustering.data
+    return _purity(clustering_data)
+
+
+
+def evaluate_distances(distance_matrix: DistanceMatrix):
+    """
+    Returns:
+        pandas.Series: All scores for the current distance matrix
+    """
+    result = {}
+    result["F-Ratio"] = f_ratio(distance_matrix.delta_values_df())
+    result["Fisher's LD"] = fisher_ld(distance_matrix)
+    result["Simple Score"] = simple_score(distance_matrix)
+    clustering = Clustering(distance_matrix)
+    result["Cluster Errors"] = cluster_errors(clustering)
+    result["Adjusted Rand Index"] = adjusted_rand_index(clustering)
+    result["Homogeneity"], result["Completeness"], result["V Measure"] = \
+        homogeneity_completeness_v_measure(clustering)
+    result["Purity"] = purity(clustering)
+    result["Entropy"] = entropy(clustering)
+    return pd.Series(result)

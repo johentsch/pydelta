@@ -26,7 +26,7 @@ from delta.corpus import Corpus, FeatureGenerator, LETTERS_PATTERN, WORD_PATTERN
 from delta.deltas import registry as functions, normalization, Normalization, \
         DeltaFunction, PDistDeltaFunction, MetricDeltaFunction, \
         CompositeDeltaFunction, DistanceMatrix
-from delta.cluster import Clustering, FlatClustering
+from delta.cluster import Clustering, FlatClustering, evaluate_distances
 
 from delta.features import get_rfe_features
 from delta.graphics import Dendrogram

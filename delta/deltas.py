@@ -63,6 +63,8 @@ from sklearn.metrics import pairwise_distances
 
 sep = '-'   # separates parts of a descriptor
 
+
+
 class _FunctionRegistry:
     """
     The registry of normalizations and delta functions.
@@ -756,24 +758,7 @@ class DistanceMatrix(pd.DataFrame):
         Checks whether the distances within a group (i.e., texts with the same
         author) are much smaller thant the distances between groups
         """
-        values = self.delta_values_df()
-
-        delta_col = DeltaColumns.DELTA.value
-
-        def ratio(group: pd.DataFrame):
-            in_group = group[DeltaColumns.AUTHOR1.value] == group[DeltaColumns.AUTHOR2.value]
-            out_group = ~in_group
-            n_in, n_out = in_group.sum(), out_group.sum()
-            if not (n_in and n_out):
-                return np.nan
-            deltas = group[delta_col]
-            within = deltas[in_group].mean()
-            without = deltas[out_group].mean()
-            return within / without
-
-        values.loc[:, delta_col] = values[delta_col] ** 2
-        ratios = values.groupby(DeltaColumns.AUTHOR1.value).apply(ratio)
-        return ratios.mean()
+        return f_ratio(self)
 
     def fisher_ld(self):
         """
@@ -781,19 +766,7 @@ class DistanceMatrix(pd.DataFrame):
 
         cf. Heeringa et al.
         """
-        values = self.delta_values_df()
-
-        def ratio(group):
-            # group = all differences with the same Text1
-            in_group = group[DeltaColumns.AUTHOR1.value] == group[DeltaColumns.AUTHOR2.value]
-            deltas = group[DeltaColumns.DELTA.value]
-            ingroup = deltas[in_group]
-            outgroup = deltas[~in_group]
-            return ((ingroup.mean() - outgroup.mean())**2) / (ingroup.var() + outgroup.var())
-
-        ratios = values.groupby(DeltaColumns.TEXT1.value).apply(ratio)
-        n_authors = values[DeltaColumns.AUTHOR1.value].nunique()
-        return ratios.sum() / comb(n_authors, 2)
+        fisher_ld(self)
 
     def z_scores(self):
         """
@@ -836,9 +809,7 @@ class DistanceMatrix(pd.DataFrame):
         different authors are considered *score* standard deviations more
         different than equal authors.
         """
-        in_group, out_group = self.z_scores().partition(square=False)
-        score = out_group.mean() - in_group.mean()
-        return score
+        return simple_score(self)
 
 
     def evaluate(self):
@@ -957,3 +928,79 @@ CompositeDeltaFunction("manhattan-sqrt", "eder_simple", "Eder's Simple")
 CompositeDeltaFunction("cosine-z_score", "cosine_delta", "Cosine Delta")
 
 # TODO hoover # rotated # pielström
+
+
+def _f_ratio(delta_values_df):
+    delta_col = DeltaColumns.DELTA.value
+
+    def ratio(group: pd.DataFrame):
+        in_group = group[DeltaColumns.AUTHOR1.value] == group[DeltaColumns.AUTHOR2.value]
+        out_group = ~in_group
+        n_in, n_out = in_group.sum(), out_group.sum()
+        if not (n_in and n_out):
+            return np.nan
+        deltas = group[delta_col]
+        within = deltas[in_group].mean()
+        without = deltas[out_group].mean()
+        return within / without
+
+    delta_values_df.loc[:, delta_col] = delta_values_df[delta_col] ** 2
+    ratios = delta_values_df.groupby(DeltaColumns.AUTHOR1.value).apply(ratio)
+    result = ratios.mean()
+    return result
+
+def f_ratio(distance_matrix: DistanceMatrix):
+    """
+    Calculates the (normalized) F-ratio over the distance matrix, according
+    to Heeringa et al.
+
+    Checks whether the distances within a group (i.e., texts with the same
+    author) are much smaller thant the distances between groups
+    """
+    delta_values_df = distance_matrix.delta_values_df()
+    result = _f_ratio(delta_values_df)
+    return result
+
+
+def _fisher_ld(delta_values_df):
+    def ratio(group):
+        # group = all differences with the same Text1
+        in_group = group[DeltaColumns.AUTHOR1.value] == group[DeltaColumns.AUTHOR2.value]
+        deltas = group[DeltaColumns.DELTA.value]
+        ingroup = deltas[in_group]
+        outgroup = deltas[~in_group]
+        return ((ingroup.mean() - outgroup.mean()) ** 2) / (ingroup.var() + outgroup.var())
+
+    ratios = delta_values_df.groupby(DeltaColumns.TEXT1.value).apply(ratio)
+    n_authors = delta_values_df[DeltaColumns.AUTHOR1.value].nunique()
+    result = ratios.sum() / comb(n_authors, 2)
+    return result
+
+def fisher_ld(distance_matrix: DistanceMatrix):
+    """
+    Calculates Fisher's Linear Discriminant for the distance matrix.
+
+    cf. Heeringa et al.
+    """
+    delta_values_df = distance_matrix.delta_values_df()
+
+    result = _fisher_ld(delta_values_df)
+    return result
+
+
+def _simple_score(partition: Tuple[pd.Series, pd.Series]):
+    in_group, out_group = partition
+    score = out_group.mean() - in_group.mean()
+    return score
+
+def simple_score(distance_matrix: DistanceMatrix):
+    """
+    Simple delta quality score for the given delta matrix:
+
+    The difference between the means of the standardized differences
+    between works of different authors and works of the same author; i.e.
+    different authors are considered *score* standard deviations more
+    different than equal authors.
+    """
+    partition = distance_matrix.z_scores().partition(square=False)
+    return _simple_score(partition)
