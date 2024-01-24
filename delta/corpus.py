@@ -423,7 +423,7 @@ class Corpus(pd.DataFrame):
         metadata.update(**kwargs)
 
         if not metadata.ordered:
-            df = df.iloc[:, (-df.sum()).argsort()]
+            df = df.iloc(axis=1)[(-df.sum()).argsort()]
             metadata.ordered = True
 
         super().__init__(df.fillna(0))
@@ -525,7 +525,7 @@ class Corpus(pd.DataFrame):
             Corpus: a new corpus shortened to `mfwords`
         """
         return Corpus(
-                corpus=self.iloc[:, :mfwords],
+                corpus=self.iloc(axis=1)[:mfwords],
                 document_describer=self.document_describer,
                 metadata=self.metadata,
                 complete=False,
