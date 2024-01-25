@@ -512,7 +512,7 @@ def compare_pairwise(df, comparisons=None):
     return pd.DataFrame(results, index=index)
 
 def map_to_index_levels(multiindex, func) -> Tuple[pd.Series, ...]:
-    index_levels = multiindex.to_frame().map(func)
+    index_levels = multiindex.to_frame(allow_duplicates=True).map(func)
     alphabet_names = [chr(n) for n in range(ord("a"), ord("a")+len(index_levels.columns))]
     index_levels.columns = alphabet_names
     return tuple(series for _, series in index_levels.items())
