@@ -766,7 +766,7 @@ class DistanceMatrix(pd.DataFrame):
 
         cf. Heeringa et al.
         """
-        fisher_ld(self)
+        return fisher_ld(self)
 
     def z_scores(self):
         """
@@ -931,7 +931,6 @@ CompositeDeltaFunction("cosine-z_score", "cosine_delta", "Cosine Delta")
 
 
 def _f_ratio(delta_values_df):
-    delta_col = DeltaColumns.DELTA.value
 
     def ratio(group: pd.DataFrame):
         in_group = group[DeltaColumns.AUTHOR1.value] == group[DeltaColumns.AUTHOR2.value]
@@ -939,12 +938,13 @@ def _f_ratio(delta_values_df):
         n_in, n_out = in_group.sum(), out_group.sum()
         if not (n_in and n_out):
             return np.nan
-        deltas = group[delta_col]
-        within = deltas[in_group].mean()
-        without = deltas[out_group].mean()
+        squared_deltas = group[squared_delta_col]
+        within = squared_deltas[in_group].mean()
+        without = squared_deltas[out_group].mean()
         return within / without
 
-    delta_values_df.loc[:, delta_col] = delta_values_df[delta_col] ** 2
+    squared_delta_col = DeltaColumns.DELTA.value + "_squared"
+    delta_values_df[squared_delta_col] = delta_values_df[DeltaColumns.DELTA.value] ** 2
     ratios = delta_values_df.groupby(DeltaColumns.AUTHOR1.value).apply(ratio)
     result = ratios.mean()
     return result
@@ -961,31 +961,31 @@ def f_ratio(distance_matrix: DistanceMatrix):
     result = _f_ratio(delta_values_df)
     return result
 
+def _fisher_ld(matrix_groups_tuple):
+    distance_matrix, group_index = matrix_groups_tuple
+    groups = group_index.unique().to_list()
+    gpb = distance_matrix.groupby(group_index)
+    groupwise_means = gpb.mean().to_numpy()
+    groupwise_vars = gpb.var().replace(0.0, np.nan).to_numpy()
+    total_discrimination = 0.0
+    for i in range(1, len(groups)):
+        means_i, means_j = groupwise_means[i:], groupwise_means[:-i]
+        var_i, var_j = groupwise_vars[i:], groupwise_vars[:-i]
+        discrimination = ((means_i - means_j) ** 2) / (var_i + var_j)
+        total_discrimination += np.nansum(discrimination)
+    return total_discrimination / (sum(range(1, len(groups))) * len(group_index))
 
-def _fisher_ld(delta_values_df):
-    def ratio(group):
-        # group = all differences with the same Text1
-        in_group = group[DeltaColumns.AUTHOR1.value] == group[DeltaColumns.AUTHOR2.value]
-        deltas = group[DeltaColumns.DELTA.value]
-        ingroup = deltas[in_group]
-        outgroup = deltas[~in_group]
-        return ((ingroup.mean() - outgroup.mean()) ** 2) / (ingroup.var() + outgroup.var())
 
-    ratios = delta_values_df.groupby(DeltaColumns.TEXT1.value).apply(ratio)
-    n_authors = delta_values_df[DeltaColumns.AUTHOR1.value].nunique()
-    result = ratios.sum() / comb(n_authors, 2)
-    return result
 
 def fisher_ld(distance_matrix: DistanceMatrix):
     """
     Calculates Fisher's Linear Discriminant for the distance matrix.
 
-    cf. Heeringa et al.
+    cf. Heeringa et al. (2002), Validating Dialect Comparison Methods, p. 4
     """
-    delta_values_df = distance_matrix.delta_values_df()
+    group_index = distance_matrix.columns.map(distance_matrix.document_describer.group_name)
+    return _fisher_ld((distance_matrix, group_index))
 
-    result = _fisher_ld(delta_values_df)
-    return result
 
 
 def _simple_score(partition: Tuple[pd.Series, pd.Series]):
