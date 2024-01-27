@@ -12,6 +12,7 @@ import glob
 from collections.abc import Mapping
 from dataclasses import dataclass
 from fnmatch import fnmatch
+from functools import cached_property
 from inspect import signature
 from typing import Optional, Union
 
@@ -20,7 +21,7 @@ import pandas as pd
 import collections
 import csv
 from math import ceil
-from delta.util import Metadata, DefaultDocumentDescriber, ngrams, append_dataframe_to_zip
+from delta.util import Metadata, DefaultDocumentDescriber, ngrams, append_dataframe_to_zip, map_to_index_levels
 
 from joblib import Parallel, delayed
 
@@ -431,6 +432,18 @@ class Corpus(pd.DataFrame):
         self.metadata = metadata
         self.document_describer = document_describer
         self.feature_generator = feature_generator
+
+    @cached_property
+    def group_index_level(self) -> pd.Series:
+        """Converts the index into a Series of group names."""
+        group_a, = map_to_index_levels(self.index, self.document_describer.group_name)
+        return group_a.rename('group')
+
+    @cached_property
+    def item_index_level(self) -> pd.Series:
+        """Converts the index into a Series of item names."""
+        group_a, = map_to_index_levels(self.index, self.document_describer.item_name)
+        return group_a.rename('item')
 
     def new_data(self, data, **metadata):
         """
