@@ -432,6 +432,8 @@ class Corpus(pd.DataFrame):
         self.metadata = metadata
         self.document_describer = document_describer
         self.feature_generator = feature_generator
+        if not metadata.get("words"):
+            metadata.words = df.shape[1]
 
     @cached_property
     def group_index_level(self) -> pd.Series:
