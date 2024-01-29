@@ -638,6 +638,7 @@ class DistanceMatrix(pd.DataFrame):
     def __init__(self, df, copy_from=None, metadata=None, corpus=None,
                  document_describer=None, **kwargs):
         super().__init__(df)
+        self.document_describer = None
         if isinstance(df, DistanceMatrix) and copy_from is None:
             copy_from = df
         if copy_from is not None:
@@ -652,8 +653,18 @@ class DistanceMatrix(pd.DataFrame):
             self.document_describer = document_describer
         elif corpus is not None:
             self.document_describer = corpus.document_describer
-        else:
-            self.document_describer = None
+
+    @cached_property
+    def group_index_level(self) -> pd.Series:
+        """Converts the index into a Series of group names."""
+        group_a, = map_to_index_levels(self.index, self.document_describer.group_name)
+        return group_a.rename('group')
+
+    @cached_property
+    def item_index_level(self) -> pd.Series:
+        """Converts the index into a Series of item names."""
+        group_a, = map_to_index_levels(self.index, self.document_describer.item_name)
+        return group_a.rename('item')
 
     @cached_property
     def long_format(self) -> pd.Series:
@@ -725,6 +736,16 @@ class DistanceMatrix(pd.DataFrame):
     def delta_values(self, transpose=False, check=None, without_diagonal=True) -> pd.Series:
         df = self.T if transpose else self
         return get_triangle_values(df, offset=int(without_diagonal), name=self.metadata.get('delta'))
+
+    def new_data(self, data, **metadata):
+        """
+        Wraps the given `DataFrame` with metadata from this DistanceMatrix object.
+
+        Args:
+            data (pandas.DataFrame): Raw data that is derived by, e.g., pandas filter operations
+            **metadata: Metadata fields that should be changed / modified
+        """
+        return DistanceMatrix(data, copy_from=self, **metadata)
 
 
 
