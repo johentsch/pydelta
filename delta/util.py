@@ -397,6 +397,34 @@ class TsvDocumentDescriber(TableDocumentDescriber):
             return set(self.table[self.group_col])
         return {self.group_name(document) for document in documents}
 
+
+class ComposerDescriber(TsvDocumentDescriber):
+    """Create composer groups for the Distant Listening Corpus."""
+    @cache
+    def group_name(self, document_name):
+        try:
+            return self.table.at[document_name, self.group_col]
+        except KeyError:
+            g_lower = document_name.split(", ")[0].lower()
+            if g_lower == "abc":
+                group_name = "Beethoven"
+            elif g_lower.startswith("bach_"):
+                group_name = "Bach, J. S."
+            elif g_lower.startswith("c_"):
+                group_name = "Schumann, C."
+            elif g_lower.startswith("jc"):
+                group_name = "Bach, J. C."
+            elif g_lower.startswith("kleine"):
+                group_name = "Schütz"
+            elif g_lower.startswith("schumann"):
+                group_name = "Schumann, R."
+            elif g_lower.startswith("wf"):
+                group_name = "Bach, W. F."
+            else:
+                g_split = g_lower.split("_")
+                group_name = g_split[0].title()
+            return group_name
+
 def ngrams(iterable, n=2, sep=None):
     """
     Transforms an iterable into an iterable of ngrams.

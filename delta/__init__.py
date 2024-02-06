@@ -30,7 +30,7 @@ from delta.cluster import Clustering, FlatClustering, evaluate_distances
 
 from delta.features import get_rfe_features
 from delta.graphics import Dendrogram
-from delta.util import compare_pairwise, Metadata, TableDocumentDescriber, TsvDocumentDescriber
+from delta.util import compare_pairwise, ComposerDescriber, Metadata, TableDocumentDescriber, TsvDocumentDescriber
 
 __all__ = [ "Corpus", "FeatureGenerator", "LETTERS_PATTERN", "WORD_PATTERN",
            "functions", "Normalization", "normalization",
