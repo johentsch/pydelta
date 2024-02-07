@@ -794,7 +794,7 @@ class DistanceMatrix(pd.DataFrame):
         Returns a distance matrix with the distances standardized using z-scores
         """
         deltas = self.long_format
-        return DistanceMatrix((self - deltas.mean()) / deltas.std(),
+        return DistanceMatrix((self - deltas.mean()) / np.std(deltas, axis=0),
                               metadata=self.metadata,
                               document_describer=self.document_describer,
                               distance_normalization='z-score')
@@ -869,7 +869,7 @@ class DistanceMatrix(pd.DataFrame):
 @normalization(title="Z-Score")
 def z_score(corpus):
     """Normalizes the corpus to the z-scores."""
-    return (corpus - corpus.mean()) / corpus.std()
+    return (corpus - corpus.mean()) / np.std(corpus, axis=0)
 
 @normalization
 def eder_std(corpus):

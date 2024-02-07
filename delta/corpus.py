@@ -16,6 +16,7 @@ from functools import cached_property
 from inspect import signature
 from typing import Optional, Union
 
+import numpy as np
 import regex as re
 import pandas as pd
 import collections
@@ -627,7 +628,7 @@ class Corpus(pd.DataFrame):
                     frequencies=True)
 
     def z_scores(self):
-        df = (self - self.mean()) / self.std()
+        df = (self - self.mean()) / np.std(self, axis=0)
         return Corpus(corpus=df,
                       document_describer=self.document_describer,
                       metadata=self.metadata,
