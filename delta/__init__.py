@@ -30,7 +30,7 @@ from delta.cluster import Clustering, FlatClustering, evaluate_distances
 
 from delta.features import get_rfe_features
 from delta.graphics import Dendrogram
-from delta.util import compare_pairwise, ComposerDescriber, Metadata, TableDocumentDescriber, TsvDocumentDescriber
+from delta.util import compare_pairwise, ComposerDescriber, EpochDescriber, Metadata, TableDocumentDescriber, TsvDocumentDescriber
 
 __all__ = [ "Corpus", "FeatureGenerator", "LETTERS_PATTERN", "WORD_PATTERN",
            "functions", "Normalization", "normalization",
@@ -38,7 +38,7 @@ __all__ = [ "Corpus", "FeatureGenerator", "LETTERS_PATTERN", "WORD_PATTERN",
            "MetricDeltaFunction", "CompositeDeltaFunction",
            "Clustering", "FlatClustering",
            "get_rfe_features", "Dendrogram",
-           "compare_pairwise", "Metadata", "TsvDocumentDescriber"]
+           "compare_pairwise", "Metadata", "ComposerDescriber", "EpochDescriber", "TsvDocumentDescriber"]
 
 try:
         from delta.cluster import KMedoidsClustering, KMedoidsClustering_distances

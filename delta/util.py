@@ -14,6 +14,7 @@ import itertools
 import scipy.spatial.distance as ssd
 import numpy as np
 
+
 class MetadataException(Exception):
     pass
 
@@ -424,6 +425,133 @@ class ComposerDescriber(TsvDocumentDescriber):
                 g_split = g_lower.split("_")
                 group_name = g_split[0].title()
             return group_name
+
+def get_middle_composition_year(
+    metadata: pd.DataFrame,
+    composed_start_column: str = "composed_start",
+    composed_end_column: str = "composed_end",
+) -> pd.Series:
+    """Copied from dimcat.resources.features"""
+    composed_start = pd.to_numeric(metadata[composed_start_column], errors="coerce")
+    composed_end = pd.to_numeric(metadata[composed_end_column], errors="coerce")
+    composed_start.fillna(composed_end, inplace=True)
+    composed_end.fillna(composed_start, inplace=True)
+    return (composed_start + composed_end) / 2
+
+
+class EpochDescriber(TsvDocumentDescriber):
+    """
+    A document describer that takes groups and item labels from an "metadata.tsv" file.
+    """
+
+    def __init__(
+            self,
+            table,
+            bins=range(1600, 2021, 50),
+            labels=None,
+            group_col="epoch",
+            name_col="piece",
+            **kwargs
+    ):
+        """
+        Args:
+            table (str or pandas.DataFrame):
+                A metadata.tsv file with two index columns, "corpus" and "piece", and two columns
+                "composed_start" and "composed_end" indicating the start and end years of the composition period.
+                One of both may be ".." if unknown. For binning, the mean of the two years is used.
+            bin (int, sequence of scalars, or IntervalIndex):
+                Argument passed to :func:`pandas.cut` to define the bins for the composition years. From the docs:
+
+                    int : Defines the number of equal-width bins in the range of x. The range of x
+                          is extended by .1% on each side to include the minimum and maximum values of x.
+                    sequence of scalars : Defines the bin edges allowing for non-uniform width.
+                          No extension of the range of x is done.
+                    IntervalIndex : Defines the exact bins to be used. Note that IntervalIndex for
+                          bins must be non-overlapping.
+
+            labels (array or False, default None):
+                Argument passed to :func:`pandas.cut` to define the labels for the bins.
+                Must be the same length as the resulting bins. If False, returns only integer
+                indicators of the bins. This affects the type of the output container (see below).
+                This argument is ignored when bins is an IntervalIndex. If True, raises an error.
+            group_col (str):
+                Name to be given to the column exposing the epochs.
+            name_col (str):
+                Unused
+
+            **kwargs:
+                Passed on to :func:`pandas.read_table`.
+        Raises:
+            ValueError: when arguments inconsistent
+        See:
+            pandas.read_table
+        """
+        if not bins:
+            raise ValueError("bins is a required argument")
+        if isinstance(table, pd.DataFrame):
+            self.table = table
+        else:
+            self.table = pd.read_csv(table, sep="\t", **kwargs)
+        if self.table.index.nlevels < 2:
+            self.table.set_index(["corpus", "piece"], inplace=True)
+        self.composition_years = get_middle_composition_year(self.table)
+        self.group_col = group_col
+        self.name_col = name_col
+        self.epochs = None
+        self._bins = None
+        self._labels = labels
+        self.bins = bins
+
+    def _get_epoch_intervals(self, as_str=True):
+        epochs = pd.cut(
+            self.composition_years,
+            bins=self.bins,
+            labels=self.labels,
+            right=False
+        ).rename(self.group_col)
+        if as_str:
+            epochs = epochs.cat.rename_categories(str)
+        return epochs
+
+    @property
+    def bins(self):
+        return self._bins
+
+    @bins.setter
+    def bins(self, bins):
+        self._bins = bins
+        self.epochs = self._get_epoch_intervals(as_str=True)
+
+    @property
+    def labels(self):
+        return self._labels
+
+    @labels.setter
+    def labels(self, labels):
+        self._labels = labels
+        self.epochs = self._get_epoch_intervals(as_str=True)
+
+    @cache
+    def group_name(self, document_name):
+        try:
+            return self.epochs.at[document_name]
+        except KeyError:
+            idx_tuple = tuple(document_name.split(", "))
+            if len(idx_tuple) > 2:
+                idx_tuple = (idx_tuple[0], ", ".join(idx_tuple[1:]))
+            return self.epochs.at[idx_tuple]
+
+    @cache
+    def item_name(self, document_name):
+        return document_name
+
+    def groups(self, documents: Optional[Iterable[str]] = None) -> Set[str]:
+        """
+        Returns the names of all groups of the given list of documents.
+        """
+        if documents is None:
+            return set(self.epochs)
+        return {self.group_name(document) for document in documents}
 
 def ngrams(iterable, n=2, sep=None):
     """

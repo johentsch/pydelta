@@ -129,7 +129,7 @@ class FlatClustering:
         dd = self.distances.document_describer
         clustering["Group"] = [dd.group_name(doc) for doc in clustering.index]
         group_count = len(dd.groups(clustering.index))
-        group_idx = pd.Series(index=clustering.Group.value_counts().index,
+        group_idx = pd.Series(index=clustering.Group.value_counts(dropna=False).index,
                               data=range(0, group_count))
         clustering["GroupID"] = clustering.Group.map(group_idx)
         return clustering, group_count
