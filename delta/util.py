@@ -695,7 +695,7 @@ def get_triangle_values(
     else:
         matrix = data
     if lower:
-        i, j = np.tril_indices_from(matrix, offset)
+        i, j = np.tril_indices_from(matrix, -offset)
     else:
         i, j = np.triu_indices_from(matrix, offset)
     values = matrix[i, j]
