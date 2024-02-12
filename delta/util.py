@@ -307,6 +307,13 @@ class TableDocumentDescriber(DocumentDescriber):
     def item_name(self, document_name):
         return self.table.at[document_name, self.name_col]
 
+def split_index_tuple(document_name: str) -> Tuple[str, str]:
+    """Splits a (corpus, piece) tuple that had previously been joined with ", "."""
+    idx_tuple = tuple(document_name.split(", "))
+    if len(idx_tuple) > 2:
+        idx_tuple = (idx_tuple[0], ", ".join(idx_tuple[1:]))
+    return idx_tuple
+
 class TsvDocumentDescriber(TableDocumentDescriber):
     """
     A document describer that takes groups and item labels from an "metadata.tsv" file.
@@ -355,14 +362,14 @@ class TsvDocumentDescriber(TableDocumentDescriber):
         try:
             return self.table.at[document_name, self.group_col]
         except KeyError:
-            return document_name.split(", ")[0]
+            return split_index_tuple(document_name)[0]
 
     @cache
     def item_name(self, document_name):
         try:
             return self.table.at[document_name, self.name_col]
         except KeyError:
-            return ", ".join(document_name.split(", ")[1:])
+            return split_index_tuple(document_name)[1]
 
     @cache
     def group_label(self, document_name):
@@ -406,7 +413,7 @@ class ComposerDescriber(TsvDocumentDescriber):
         try:
             return self.table.at[document_name, self.group_col]
         except KeyError:
-            g_lower = document_name.split(", ")[0].lower()
+            g_lower = split_index_tuple(document_name)[0].lower()
             if g_lower == "abc":
                 group_name = "Beethoven"
             elif g_lower.startswith("bach_"):
@@ -426,6 +433,50 @@ class ComposerDescriber(TsvDocumentDescriber):
                 group_name = g_split[0].title()
             return group_name
 
+
+class TsvColumnDescriber(TsvDocumentDescriber):
+    """
+    A document describer that takes groups and item labels from an "metadata.tsv" file.
+    """
+
+    def __init__(self, table, group_col="corpus", name_col="piece", **kwargs):
+        if isinstance(table, pd.DataFrame):
+            self.table = table
+        else:
+            self.table = pd.read_csv(table, sep="\t", **kwargs)
+        if self.table.index.nlevels < 2:
+            self.table.set_index(["corpus", "piece"], inplace=True)
+        self.group_col = group_col
+        self.name_col = name_col
+
+    @cache
+    def group_name(self, document_name):
+        try:
+            return self.table.at[document_name, self.group_col]
+        except KeyError:
+            idx_tuple = split_index_tuple(document_name)
+            try:
+                return self.table.at[idx_tuple, self.group_col]
+            except KeyError:
+                if self.group_col not in self.table.columns:
+                    print(f"{self.__class__.__name__} missing column {self.group_col!r} for {document_name}")
+                else:
+                    print(f"{self.__class__.__name__} table is missing {document_name} and also {idx_tuple}")
+                raise
+
+class ModeDescriber(TsvColumnDescriber):
+    """Create composer groups for the Distant Listening Corpus."""
+
+    def __init__(self, table, group_col="mode", name_col="piece", **kwargs):
+        super().__init__(table, group_col, name_col, **kwargs)
+        annotated_key = self.table.annotated_key
+        mode = annotated_key.str.islower().map({True: "minor", False: "major"}).rename(group_col)
+        if self.group_col in self.table.columns:
+            self.table.loc[:, self.group_col] = mode
+        else:
+            self.table = pd.concat([self.table, mode], axis=1)
+
+
 def get_middle_composition_year(
     metadata: pd.DataFrame,
     composed_start_column: str = "composed_start",
@@ -439,7 +490,7 @@ def get_middle_composition_year(
     return (composed_start + composed_end) / 2
 
 
-class EpochDescriber(TsvDocumentDescriber):
+class EpochDescriber(TsvColumnDescriber):
     """
     A document describer that takes groups and item labels from an "metadata.tsv" file.
     """
@@ -451,6 +502,7 @@ class EpochDescriber(TsvDocumentDescriber):
             labels=None,
             group_col="epoch",
             name_col="piece",
+            by_mode: bool = False,
             **kwargs
     ):
         """
@@ -488,19 +540,20 @@ class EpochDescriber(TsvDocumentDescriber):
         """
         if not bins:
             raise ValueError("bins is a required argument")
-        if isinstance(table, pd.DataFrame):
-            self.table = table
-        else:
-            self.table = pd.read_csv(table, sep="\t", **kwargs)
-        if self.table.index.nlevels < 2:
-            self.table.set_index(["corpus", "piece"], inplace=True)
+        super().__init__(table, group_col, name_col, **kwargs)
         self.composition_years = get_middle_composition_year(self.table)
-        self.group_col = group_col
-        self.name_col = name_col
         self.epochs = None
         self._bins = None
         self._labels = labels
         self.bins = bins
+        self.by_mode = by_mode
+        if by_mode:
+            annotated_key = self.table.annotated_key
+            mode = annotated_key.str.islower().map({True: "minor", False: "major"}).rename("mode")
+            if "mode" in self.table.columns:
+                self.table.loc[:, "mode"] = mode
+            else:
+                self.table = pd.concat([self.table, mode], axis=1)
 
     def _get_epoch_intervals(self, as_str=True):
         epochs = pd.cut(
@@ -534,12 +587,18 @@ class EpochDescriber(TsvDocumentDescriber):
     @cache
     def group_name(self, document_name):
         try:
-            return self.epochs.at[document_name]
+            result = self.epochs.at[document_name]
+            if self.by_mode:
+                mode = self.table.at[document_name, "mode"]
+                result = f"{result}, {mode}"
         except KeyError:
-            idx_tuple = tuple(document_name.split(", "))
-            if len(idx_tuple) > 2:
-                idx_tuple = (idx_tuple[0], ", ".join(idx_tuple[1:]))
-            return self.epochs.at[idx_tuple]
+            idx_tuple = split_index_tuple(document_name)
+            result = self.epochs.at[idx_tuple]
+            if self.by_mode:
+                mode = self.table.at[idx_tuple, "mode"]
+                result = f"{result}, {mode}"
+        return result
+
 
     @cache
     def item_name(self, document_name):
@@ -669,6 +728,7 @@ def compare_pairwise(df, comparisons=None):
 
 def map_to_index_levels(multiindex, func) -> Tuple[pd.Series, ...]:
     if multiindex.nlevels == 1:
+        func(multiindex.to_frame().iloc[0,0])
         index_levels = multiindex.to_frame().map(func)
     else:
         index_levels = multiindex.to_frame(allow_duplicates=True).map(func)
